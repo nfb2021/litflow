@@ -30,6 +30,19 @@ RESPONSE_SELECTORS = [
 # Close button of promo/announcement modals shown over a notebook
 DIALOG_CLOSE_SELECTOR = "mat-dialog-container button[aria-label*='lose' i]"
 
+# Add-source dialog (Gemini Notebook)
+ADD_SOURCE_BUTTON = "button[aria-label='Add source']"
+SOURCE_ACTION_BUTTON = "mat-dialog-container button.source-action-button:has-text('{}')"
+URL_INPUT = "mat-dialog-container textarea[aria-label='Enter URLs']"
+TEXT_INPUT = "mat-dialog-container textarea[aria-label='Pasted text']"
+INSERT_BUTTON = "mat-dialog-container button:has-text('Insert')"
+# Source list rows: processed rows get a "Select <title>" checkbox, failed
+# imports get the error class and an "Error info" icon instead
+SOURCE_ROW = ".source-panel .single-source-container"
+SOURCE_ROW_TITLE = "button.source-stretched-button"
+SOURCE_ROW_READY = "input[type=checkbox]"
+SOURCE_ROW_ERROR_CLASS = "single-source-error-container"
+
 # Browser Configuration
 BROWSER_ARGS = [
     '--disable-blink-features=AutomationControlled',  # Patches navigator.webdriver

@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from auth_manager import AuthManager
 from notebook_manager import NotebookLibrary
-from config import QUERY_INPUT_SELECTORS, RESPONSE_SELECTORS, DIALOG_CLOSE_SELECTOR
+from config import QUERY_INPUT_SELECTORS, RESPONSE_SELECTORS
 from browser_utils import BrowserFactory, StealthUtils
 
 
@@ -64,22 +64,6 @@ def _bottom_most_response(page, selectors):
             continue
     return best_text, best_y
 
-
-def _dismiss_dialogs(page):
-    """
-    Close modal promos (e.g. the "Gemini Notebook" limits/accessibility
-    announcement) that open over the notebook and can swallow typing.
-    """
-    for _ in range(3):
-        btn = page.query_selector(DIALOG_CLOSE_SELECTOR)
-        if not btn or not btn.is_visible():
-            return
-        try:
-            btn.click()
-            print("  ✓ Dismissed popup dialog")
-        except:
-            page.keyboard.press("Escape")
-        time.sleep(1)
 
 
 FOLLOW_UP_REMINDER = (
@@ -154,7 +138,7 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
             print("  ❌ Could not find query input")
             return None
 
-        _dismiss_dialogs(page)
+        StealthUtils.dismiss_dialogs(page)
 
         # Snapshot the text of the visually-bottom-most (most recent) response
         # BEFORE we submit, so we don't mistake pre-existing chat history for

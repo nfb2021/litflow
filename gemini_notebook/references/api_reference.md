@@ -41,6 +41,32 @@ python scripts/run.py ask_question.py --question "..." --show-browser
 
 **Returns:** Answer text with follow-up prompt appended
 
+### add_source.py
+Add sources to a notebook through the "Add sources" dialog.
+
+```bash
+# Upload local files (repeatable)
+python3 scripts/run.py add_source.py --notebook-id ID --file paper.pdf --file notes.md
+
+# Website / YouTube URLs (repeatable)
+python3 scripts/run.py add_source.py --notebook-id ID --url "https://..."
+
+# Pasted text, inline or from a file
+python3 scripts/run.py add_source.py --notebook-id ID --text "..."
+python3 scripts/run.py add_source.py --notebook-id ID --text-file answers.md
+```
+
+**Parameters:**
+- `--notebook-id` / `--notebook-url`: Target notebook (defaults to the active notebook)
+- `--file`: Local file to upload (repeatable)
+- `--url`: Website or YouTube URL (repeatable)
+- `--text` / `--text-file`: Text added as one pasted-text source
+- `--timeout`: Seconds to wait for processing (default 300)
+- `--show-browser`: Make browser visible
+
+**Returns:** List of new sources with status `ready` / `failed` / `processing`;
+exit code 0 only if all are `ready`
+
 ### notebook_manager.py
 Manage notebook library with CRUD operations.
 

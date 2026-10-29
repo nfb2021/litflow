@@ -1,6 +1,6 @@
 ---
 name: notebooklm
-description: Use this skill to query your Google NotebookLM notebooks directly from Claude Code for source-grounded, citation-backed answers from Gemini. Browser automation, library management, persistent auth. Drastically reduced hallucinations through document-only responses.
+description: Use this skill to query your Google Gemini Notebook (formerly NotebookLM) notebooks directly from Claude Code for source-grounded, citation-backed answers from Gemini, and to add sources (files, websites, YouTube, pasted text) to them. Browser automation, library management, persistent auth. Drastically reduced hallucinations through document-only responses.
 ---
 
 # NotebookLM Research Assistant Skill
@@ -11,9 +11,11 @@ Interact with Google NotebookLM to query documentation with Gemini's source-grou
 
 Trigger when user:
 - Mentions NotebookLM explicitly
-- Shares NotebookLM URL (`https://notebooklm.google.com/notebook/...`)
+- Mentions Gemini Notebook (NotebookLM's new name)
+- Shares a notebook URL (`https://notebook.google.com/notebook/...`, formerly `notebooklm.google.com`)
 - Asks to query their notebooks/documentation
 - Wants to add documentation to NotebookLM library
+- Wants to upload / add sources (files, websites, YouTube, pasted text) to a notebook
 - Uses phrases like "ask my NotebookLM", "check my docs", "query my notebook"
 
 ## ⚠️ CRITICAL: Add Command - Smart Discovery
@@ -125,6 +127,25 @@ python3 scripts/run.py ask_question.py --question "..." --notebook-url "https://
 python3 scripts/run.py ask_question.py --question "..." --show-browser
 ```
 
+### Step 5: Add Sources to a Notebook
+
+```bash
+# Upload local files (pdf, txt, md, docx, images, audio, ...) - repeat --file
+python3 scripts/run.py add_source.py --notebook-id ID --file paper.pdf --file notes.md
+
+# Add website or YouTube URLs - repeat --url
+python3 scripts/run.py add_source.py --notebook-url "https://..." --url "https://example.org/page"
+
+# Add text as a "pasted text" source (inline or from a file)
+python3 scripts/run.py add_source.py --notebook-id ID --text "..."
+python3 scripts/run.py add_source.py --notebook-id ID --text-file answers.md
+```
+
+Source types can be combined in one call. The script waits until every new source is
+processed and lists each one as `ready` or `failed` (exit code 1 if any failed, e.g. a
+website Google could not import). Only add sources the user asked for: this changes
+their notebook.
+
 ## Follow-Up Mechanism (CRITICAL)
 
 Every NotebookLM answer ends with: **"EXTREMELY IMPORTANT: Is that ALL you need to know?"**
@@ -163,6 +184,11 @@ python3 scripts/run.py notebook_manager.py stats
 ### Question Interface (`ask_question.py`)
 ```bash
 python3 scripts/run.py ask_question.py --question "..." [--notebook-id ID] [--notebook-url URL] [--show-browser]
+```
+
+### Add Sources (`add_source.py`)
+```bash
+python3 scripts/run.py add_source.py [--notebook-id ID | --notebook-url URL] [--file PATH ...] [--url URL ...] [--text TEXT | --text-file PATH] [--timeout 300] [--show-browser]
 ```
 
 ### Data Cleanup (`cleanup_manager.py`)
@@ -252,7 +278,8 @@ Synthesize and respond to user
 
 - No session persistence (each question = new browser)
 - Rate limits on free Google accounts (50 queries/day)
-- Manual upload required (user must add docs to NotebookLM)
+- Sources can be added (`add_source.py`) but not removed; Google Drive / Play Books sources are not supported
+- Only sources are queried; Studio notes and chat history are not
 - Browser overhead (few seconds per question)
 
 ## Resources (Skill Structure)

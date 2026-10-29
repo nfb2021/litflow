@@ -9,7 +9,7 @@ import random
 from typing import Optional, List
 
 from patchright.sync_api import Playwright, BrowserContext, Page
-from config import BROWSER_PROFILE_DIR, STATE_FILE, BROWSER_ARGS, USER_AGENT, DESKTOP_VIEWPORT
+from config import BROWSER_PROFILE_DIR, STATE_FILE, BROWSER_ARGS, USER_AGENT, DESKTOP_VIEWPORT, DIALOG_CLOSE_SELECTOR
 
 
 class BrowserFactory:
@@ -91,6 +91,23 @@ class StealthUtils:
             element.type(char, delay=random.uniform(25, 75))
             if random.random() < 0.05:
                 time.sleep(random.uniform(0.15, 0.4))
+
+    @staticmethod
+    def dismiss_dialogs(page: Page):
+        """
+        Close modal promos (e.g. the "Gemini Notebook" limits/accessibility
+        announcement) that open over the notebook and can swallow typing.
+        """
+        for _ in range(3):
+            btn = page.query_selector(DIALOG_CLOSE_SELECTOR)
+            if not btn or not btn.is_visible():
+                return
+            try:
+                btn.click()
+                print("  ✓ Dismissed popup dialog")
+            except:
+                page.keyboard.press("Escape")
+            time.sleep(1)
 
     @staticmethod
     def realistic_click(page: Page, selector: str):
