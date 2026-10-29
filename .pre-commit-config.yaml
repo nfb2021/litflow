@@ -16,6 +16,10 @@ repos:
         name: uv lock (gemini_notebook)
         args: [--project, gemini_notebook]
         files: ^gemini_notebook/(pyproject\.toml|uv\.lock)$
+      - id: uv-lock
+        name: uv lock (zotero)
+        args: [--project, zotero]
+        files: ^zotero/(pyproject\.toml|uv\.lock)$
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -49,3 +53,8 @@ repos:
         entry: uv run --locked --project gemini_notebook --group docs marimo check
         language: system
         files: ^gemini_notebook/docs/.*\.py$
+      - id: marimo-check-zotero
+        name: marimo check (zotero)
+        entry: uv run --locked --project zotero --group docs marimo check
+        language: system
+        files: ^zotero/docs/.*\.py$
