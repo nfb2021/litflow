@@ -64,7 +64,7 @@ def _(mo):
     your login. All of it is one command, `gnb`. This notebook walks through how that
     works, and every section with a button runs the real `gnb`.
 
-    > Open it with `uv run --group docs marimo edit docs/guide.py` from the skill folder.
+    > Open it with `uvx --with-editable . marimo edit docs/guide.py` from the skill folder.
     > Nothing runs against Google until you press a button.
     """)
     return
@@ -523,31 +523,29 @@ def _(config, mo):
 
 @app.cell(hide_code=True)
 def _(config, mo):
-    mo.md(
-        rf"""
-        ### Staying logged in
+    mo.md(rf"""
+    ### Staying logged in
 
-        Playwright loses Google's *session* cookies between browser starts, so the skill
-        uses both a persistent Chrome profile **and** re-injects the cookies saved at login
-        (`browser_state/state.json`) every time. Details: `AUTHENTICATION.md`.
+    Playwright loses Google's *session* cookies between browser starts, so the skill
+    uses both a persistent Chrome profile **and** re-injects the cookies saved at login
+    (`browser_state/state.json`) every time. Details: `AUTHENTICATION.md`.
 
-        Everything personal lives in `{config.DATA_DIR}`, outside the repository
-        (set `GEMINI_NOTEBOOK_HOME` to use another folder). Treat it like a password.
+    Everything personal lives in `{config.DATA_DIR}`, outside the repository
+    (set `GEMINI_NOTEBOOK_HOME` to use another folder). Treat it like a password.
 
-        ## 6 · Limits and fixes
+    ## 6 · Limits and fixes
 
-        | | |
-        |---|---|
-        | Sources can be added, not removed; no Google Drive / Play Books | use the web app |
-        | Only sources are searched, not Studio notes or chat history | add notes as pasted text |
-        | ≈50 questions/day on free accounts | wait, or `gnb auth reauth` with another account |
-        | Login expires after a few weeks | `gnb auth reauth` |
-        | `gnb: command not found` | `uv tool install --editable .` from the skill folder, then `uv tool update-shell` |
-        | Something breaks after a Google UI change | rerun with *Show browser*, update `config.py` |
+    | | |
+    |---|---|
+    | Sources can be added, not removed; no Google Drive / Play Books | use the web app |
+    | Only sources are searched, not Studio notes or chat history | add notes as pasted text |
+    | ≈50 questions/day on free accounts | wait, or `gnb auth reauth` with another account |
+    | Login expires after a few weeks | `gnb auth reauth` |
+    | `gnb: command not found` | `uv tool install --editable .` from the skill folder, then `uv tool update-shell` |
+    | Something breaks after a Google UI change | rerun with *Show browser*, update `config.py` |
 
-        More: `README.md`, `references/troubleshooting.md`.
-        """
-    )
+    More: `README.md`, `references/troubleshooting.md`.
+    """)
     return
 
 

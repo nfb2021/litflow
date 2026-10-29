@@ -28,7 +28,7 @@ Fork: [nfb2021/skills](https://github.com/nfb2021/skills) → `gemini_notebook/`
 - `add_source.py` - add local files, website / YouTube URLs and pasted text to a notebook;
   waits for processing and reports each source as ready / failed
 - `--timeout` option for `ask_question.py`
-- `docs/guide.py` - interactive marimo guide (`uv run --group docs marimo edit docs/guide.py`)
+- `docs/guide.py` - interactive marimo guide (`uvx --with-editable . marimo edit docs/guide.py`)
 - `clean_answer()` in `ask_question.py` (answer clean-up as a reusable function)
 
 ### Changed
