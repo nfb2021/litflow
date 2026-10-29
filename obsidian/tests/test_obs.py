@@ -118,11 +118,21 @@ def test_find_quote_exact_page_and_approx(backend, monkeypatch):
     )
 
 
+def test_scan_without_text_layer():
+    assert (
+        pdftext.find_quote("any quote of reasonable length", ["", " ", "12"])["status"]
+        == "no-text"
+    )
+
+
 def test_quote_with_lost_spaces():
     assert (
         pdftext.find_quote(
             "the number of looks per pixel is four",
-            ["The numberof looks per pi xel is four."],
+            [
+                "The numberof looks per pi xel is four. "
+                + "Filler text with letters. " * 10
+            ],
         )["status"]
         == "found"
     )
@@ -356,6 +366,19 @@ def test_lint_gate_json(obs):
     g = json.loads(obs("lint", "--gate").stdout)
     assert g["verdict"] == "blocked"
     assert any(i["code"] == "quote-not-found" for i in g["issues"])
+
+
+def test_rejected_claim_is_a_record_not_an_error(obs):
+    obs("statement", "add", "Some proposition about forests")
+    c = _claim(
+        obs,
+        "doe2026gnsst",
+        "S-0001",
+        "origin",
+        quote="not in the pdf at all, really not",
+    )
+    obs("verify", c, "--rejected", "--by", "verifier", "--note", "not in the paper")
+    assert json.loads(obs("lint", "--gate").stdout)["verdict"] == "pass"
 
 
 def test_lint_broken_link_and_bad_yaml(obs):

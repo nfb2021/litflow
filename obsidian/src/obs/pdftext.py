@@ -54,6 +54,12 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def has_text(page_texts: list[str]) -> bool:
+    """False for image-only scans (no text layer): fewer than ~100 letters a page."""
+    letters = sum(len(re.findall(r"[^\W\d_]", t)) for t in page_texts)
+    return letters >= 100 * max(1, len(page_texts)) * 0.5
+
+
 def _compact(text: str) -> str:
     return re.sub(r"[^\w]", "", text)
 
@@ -62,8 +68,10 @@ def find_quote(quote: str, page_texts: list[str]) -> dict:
     """Locate a quote. Returns {status, page (1-based), score}.
 
     status: found (exact after normalizing), approx (>= APPROX similar),
-    not-found.
+    not-found, no-text (the PDF is a scan without a text layer: OCR it).
     """
+    if not has_text(page_texts):
+        return {"status": "no-text", "page": None, "score": 0.0}
     q = normalize(quote)
     if len(q) < 12:
         return {

@@ -16,8 +16,14 @@ uv tool install "git+https://github.com/nfb2021/skills.git#subdirectory=obsidian
 obs --version
 ```
 
-Optional: `pdftotext` (poppler) gives better PDF text than the built-in pypdf
-fallback: `brew install poppler` / `apt install poppler-utils`.
+Optional, for checking quotes in PDFs:
+
+- `pdftotext` (poppler) reads columns better than the built-in pypdf fallback:
+  `brew install poppler` / `apt install poppler-utils`.
+- `ocrmypdf` adds a text layer to scans of older papers (`obs ocr KEY -l deu+eng`):
+  `brew install ocrmypdf tesseract-lang` / `apt install ocrmypdf tesseract-ocr-deu`.
+  Tested on Einstein's 1905 photoelectric paper (Annalen der Physik 17): 17 pages
+  in 16 s, prose quotes check cleanly, formulas do not survive OCR.
 
 For Claude Code, link the skill: `ln -s ~/src/skills/obsidian ~/.claude/skills/obsidian`.
 For Pi, add `~/src/skills` to `skills` in `~/.pi/agent/settings.json`.

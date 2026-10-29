@@ -41,8 +41,13 @@ Claim **roles**:
 
 1. `obs pdf-text KEY --grep "word"` finds the sentence; `--page N` shows a page.
 2. `obs statement find "the proposition"`. Reuse an existing statement whenever it
-   says the same thing. Otherwise `obs statement add "..."`: one sentence, the
-   proposition only, no author names, no hedges the source does not have.
+   says the same thing. Otherwise `obs statement add "..."`: one sentence, ONE
+   proposition, in the source's own strength (an assumption stays an
+   assumption), no author names. A sentence that joins a paper's own result
+   with a result it cites ("predicts X, matching Lenard's measurements") is two
+   statements: the paper's part is `origin`, the cited part is `restates -c`.
+   Modern notation the paper does not use (hν for Einstein's (R/N)βν) belongs in
+   a glossary alias, not in the statement.
 3. `obs claim add -p KEY -s S-0001 -q "exact sentence from the PDF" -r ROLE [-c CITED_KEY ...] --by YOUR_ROLE --note "site, sensor, conditions"`.
    The quote is looked up in the PDF. Not found → nothing is saved: copy the
    wording again from `obs pdf-text`. The page is filled in from the PDF.
@@ -72,6 +77,10 @@ only: does the quote say the statement, in this paper, without overreach?
 - problems: circular citation, drift, restates without citation.
 
 Report support as "N independent sources", never as a count of papers.
+
+Quotes are checked against the PDF text. A scan without text → `obs ocr KEY
+-l deu+eng` once (needs ocrmypdf). Formulas rarely survive OCR: quote the prose
+around them, and leave the formula to the verifier reading the page.
 
 ## Maps and questions (wayfinding)
 

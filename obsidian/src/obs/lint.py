@@ -105,7 +105,7 @@ def lint(vault: Vault) -> list[dict]:
                     "copy the sentence from the paper",
                 )
             )
-        if c.fm.get("page") in (None, ""):
+        if c.fm.get("page") in (None, "") and ver != "rejected":
             out.append(
                 _issue(
                     "warning",
@@ -156,6 +156,8 @@ def lint(vault: Vault) -> list[dict]:
                 )
             )
         qc = c.fm.get("quote_check")
+        if ver == "rejected":
+            continue  # kept as the record of what the paper does not say
         if qc == "not-found":
             out.append(
                 _issue(

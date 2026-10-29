@@ -416,16 +416,23 @@ def trace(statement: str, vault: Path = VaultOpt, as_json: bool = JsonOpt) -> No
 
 
 # --- claims -----------------------------------------------------------------
+def paper_pdf(v: Vault, paper) -> Path | None:
+    """The PDF to read for a paper: its OCR copy if `obs ocr` made one."""
+    ocr = v.root / ".obs" / "ocr" / f"{paper.id}.pdf"
+    if ocr.exists():
+        return ocr
+    if not paper.fm.get("pdf"):
+        return None
+    pdf = Path(str(paper.fm["pdf"])).expanduser()
+    if not pdf.is_absolute():
+        pdf = v.root / pdf
+    return pdf if pdf.exists() else None
+
+
 def _check_claim(v: Vault, c) -> dict:
     paper = v.notes.get((c.links("paper") or [""])[0])
-    pdf = (
-        Path(str(paper.fm["pdf"])).expanduser()
-        if paper and paper.fm.get("pdf")
-        else None
-    )
-    if pdf and not pdf.is_absolute():
-        pdf = v.root / pdf
-    if not pdf or not pdf.exists():
+    pdf = paper_pdf(v, paper) if paper else None
+    if not pdf:
         return {"status": "no-pdf", "page": None, "score": 0.0}
     try:
         texts = pdftext.pages(pdf, v.root / ".obs" / "cache")
@@ -437,7 +444,7 @@ def _check_claim(v: Vault, c) -> dict:
 def _apply_check(v: Vault, c, r: dict) -> None:
     c.fm["quote_check"] = (
         None
-        if r["status"] == "no-pdf"
+        if r["status"] in ("no-pdf", "no-text")
         else ("not-found" if r["status"] == "not-found" else "found")
     )
     if r["status"] in ("found", "approx"):
@@ -541,6 +548,10 @@ def claim_add(
         )
     elif r["status"] == "no-pdf":
         info("note: no PDF on the paper note, quote not checked")
+    elif r["status"] == "no-text":
+        info(
+            f"note: the PDF of {p.id} is a scan without text, quote not checked. Run `obs ocr {p.id}`, then `obs check-quotes {c.id}`"
+        )
     elif page and str(r["page"]) != str(page):
         info(f"note: quote found on PDF page {r['page']}, you gave {page}")
 
@@ -594,10 +605,14 @@ def pdf_text(
         p = v.get(citekey, "paper")
     except VaultError as e:
         fail(str(e))
-    pdf = Path(str(p.fm.get("pdf", ""))).expanduser()
-    if not p.fm.get("pdf") or not pdf.exists():
+    pdf = paper_pdf(v, p)
+    if not pdf:
         fail(f"{p.id} has no readable PDF (pdf: {p.fm.get('pdf')})")
     texts = pdftext.pages(pdf, v.root / ".obs" / "cache")
+    if not pdftext.has_text(texts):
+        fail(
+            f"the PDF of {p.id} is a scan without a text layer; run `obs ocr {p.id}` first"
+        )
     for i, t in enumerate(texts, 1):
         if page and i != page:
             continue
@@ -607,6 +622,57 @@ def pdf_text(
                     typer.echo(f"p{i}: {line.strip()}")
         else:
             typer.echo(f"=== page {i} ===\n{t.strip()}\n")
+
+
+@app.command()
+def ocr(
+    citekey: str,
+    lang: str = typer.Option(
+        "eng", "--lang", "-l", help="Tesseract languages, e.g. deu+eng"
+    ),
+    vault: Path = VaultOpt,
+) -> None:
+    """Add a text layer to a scanned PDF (needs ocrmypdf). The original stays untouched."""
+    import shutil
+    import subprocess
+
+    v = open_vault(vault)
+    try:
+        p = v.get(citekey, "paper")
+    except VaultError as e:
+        fail(str(e))
+    src = Path(str(p.fm.get("pdf", ""))).expanduser()
+    if not p.fm.get("pdf") or not src.exists():
+        fail(f"{p.id} has no readable PDF (pdf: {p.fm.get('pdf')})")
+    if not shutil.which("ocrmypdf"):
+        fail(
+            "ocrmypdf is not installed: brew install ocrmypdf tesseract-lang / apt install ocrmypdf tesseract-ocr-deu"
+        )
+    out = v.root / ".obs" / "ocr" / f"{p.id}.pdf"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    info(f"OCR of {src.name} ({lang}) ...")
+    r = subprocess.run(
+        [
+            "ocrmypdf",
+            "--skip-text",
+            "-l",
+            lang,
+            "--output-type",
+            "pdf",
+            str(src),
+            str(out),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if r.returncode != 0:
+        fail(f"ocrmypdf failed: {r.stderr.strip()[-500:]}")
+    p.fm["ocr"] = f"{lang}, {today()}"
+    v.save(p)
+    texts = pdftext.pages(out, v.root / ".obs" / "cache")
+    typer.echo(
+        f"{p.id}: {len(texts)} pages, {sum(len(t) for t in texts)} characters of text"
+    )
 
 
 @app.command()
