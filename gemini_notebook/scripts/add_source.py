@@ -110,7 +110,7 @@ def add_sources(notebook_url, files=None, urls=None, text=None,
 
     auth = AuthManager()
     if not auth.is_authenticated():
-        print("⚠️ Not authenticated. Run: python3 scripts/run.py auth_manager.py setup")
+        print("⚠️ Not authenticated. Run: uv run scripts/auth_manager.py setup")
         return None
 
     print(f"📚 Notebook: {notebook_url}")

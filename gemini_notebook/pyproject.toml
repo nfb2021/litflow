@@ -1,0 +1,18 @@
+[project]
+name = "gemini-notebook-skill"
+version = "2.0.0"
+description = "Claude Code skill: query Gemini Notebook (formerly NotebookLM) notebooks and add sources to them"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "patchright==1.55.2",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+docs = [
+    "marimo>=0.25.2",
+]

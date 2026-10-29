@@ -3,7 +3,7 @@ name: notebooklm
 description: Use this skill to query your Google Gemini Notebook (formerly NotebookLM) notebooks directly from Claude Code for source-grounded, citation-backed answers from Gemini, and to add sources (files, websites, YouTube, pasted text) to them. Browser automation, library management, persistent auth. Drastically reduced hallucinations through document-only responses.
 ---
 
-# NotebookLM Research Assistant Skill
+# Gemini Notebook (NotebookLM) Research Assistant Skill
 
 Interact with Google NotebookLM to query documentation with Gemini's source-grounded answers. Each question opens a fresh browser session, retrieves the answer exclusively from your uploaded documents, and closes.
 
@@ -25,10 +25,10 @@ When user wants to add a notebook without providing details:
 **SMART ADD (Recommended)**: Query the notebook first to discover its content:
 ```bash
 # Step 1: Query the notebook about its content
-python3 scripts/run.py ask_question.py --question "What is the content of this notebook? What topics are covered? Provide a complete overview briefly and concisely" --notebook-url "[URL]"
+uv run scripts/ask_question.py --question "What is the content of this notebook? What topics are covered? Provide a complete overview briefly and concisely" --notebook-url "[URL]"
 
 # Step 2: Use the discovered information to add it
-python3 scripts/run.py notebook_manager.py add --url "[URL]" --name "[Based on content]" --description "[Based on content]" --topics "[Based on content]"
+uv run scripts/notebook_manager.py add --url "[URL]" --name "[Based on content]" --description "[Based on content]" --topics "[Based on content]"
 ```
 
 **MANUAL ADD**: If user provides all details:
@@ -39,31 +39,28 @@ python3 scripts/run.py notebook_manager.py add --url "[URL]" --name "[Based on c
 
 NEVER guess or use generic descriptions! If details missing, use Smart Add to discover them.
 
-## Critical: Always Use run.py Wrapper
+## Critical: Run Scripts with uv from the Skill Directory
 
-**NEVER call scripts directly. ALWAYS use `python3 scripts/run.py [script]`:**
+**ALWAYS `cd` into this skill's directory and run scripts with `uv run scripts/<script>.py`:**
 
 ```bash
-# ✅ CORRECT - Always use run.py:
-python3 scripts/run.py auth_manager.py status
-python3 scripts/run.py notebook_manager.py list
-python3 scripts/run.py ask_question.py --question "..."
+# ✅ CORRECT
+cd <skill directory> && uv run scripts/auth_manager.py status
+uv run scripts/notebook_manager.py list
+uv run scripts/ask_question.py --question "..."
 
-# ❌ WRONG - Never call directly:
-python3 scripts/auth_manager.py status  # Fails without venv!
+# ❌ WRONG - system Python has no patchright
+python3 scripts/auth_manager.py status
 ```
 
-The `run.py` wrapper automatically:
-1. Creates `.venv` if needed
-2. Installs all dependencies
-3. Activates environment
-4. Executes script properly
+`uv run` reads `pyproject.toml` / `uv.lock`, creates `.venv/` on first use and keeps it in
+sync. Never install anything with pip.
 
 ## Core Workflow
 
 ### Step 1: Check Authentication Status
 ```bash
-python3 scripts/run.py auth_manager.py status
+uv run scripts/auth_manager.py status
 ```
 
 If not authenticated, proceed to setup.
@@ -71,7 +68,7 @@ If not authenticated, proceed to setup.
 ### Step 2: Authenticate (One-Time Setup)
 ```bash
 # Browser MUST be visible for manual Google login
-python3 scripts/run.py auth_manager.py setup
+uv run scripts/auth_manager.py setup
 ```
 
 **Important:**
@@ -84,61 +81,61 @@ python3 scripts/run.py auth_manager.py setup
 
 ```bash
 # List all notebooks
-python3 scripts/run.py notebook_manager.py list
+uv run scripts/notebook_manager.py list
 
 # BEFORE ADDING: Ask user for metadata if unknown!
 # "What does this notebook contain?"
 # "What topics should I tag it with?"
 
 # Add notebook to library (ALL parameters are REQUIRED!)
-python3 scripts/run.py notebook_manager.py add \
-  --url "https://notebooklm.google.com/notebook/..." \
+uv run scripts/notebook_manager.py add \
+  --url "https://notebook.google.com/notebook/..." \
   --name "Descriptive Name" \
   --description "What this notebook contains" \  # REQUIRED - ASK USER IF UNKNOWN!
   --topics "topic1,topic2,topic3"  # REQUIRED - ASK USER IF UNKNOWN!
 
 # Search notebooks by topic
-python3 scripts/run.py notebook_manager.py search --query "keyword"
+uv run scripts/notebook_manager.py search --query "keyword"
 
 # Set active notebook
-python3 scripts/run.py notebook_manager.py activate --id notebook-id
+uv run scripts/notebook_manager.py activate --id notebook-id
 
 # Remove notebook
-python3 scripts/run.py notebook_manager.py remove --id notebook-id
+uv run scripts/notebook_manager.py remove --id notebook-id
 ```
 
 ### Quick Workflow
-1. Check library: `python3 scripts/run.py notebook_manager.py list`
-2. Ask question: `python3 scripts/run.py ask_question.py --question "..." --notebook-id ID`
+1. Check library: `uv run scripts/notebook_manager.py list`
+2. Ask question: `uv run scripts/ask_question.py --question "..." --notebook-id ID`
 
 ### Step 4: Ask Questions
 
 ```bash
 # Basic query (uses active notebook if set)
-python3 scripts/run.py ask_question.py --question "Your question here"
+uv run scripts/ask_question.py --question "Your question here"
 
 # Query specific notebook
-python3 scripts/run.py ask_question.py --question "..." --notebook-id notebook-id
+uv run scripts/ask_question.py --question "..." --notebook-id notebook-id
 
 # Query with notebook URL directly
-python3 scripts/run.py ask_question.py --question "..." --notebook-url "https://..."
+uv run scripts/ask_question.py --question "..." --notebook-url "https://..."
 
 # Show browser for debugging
-python3 scripts/run.py ask_question.py --question "..." --show-browser
+uv run scripts/ask_question.py --question "..." --show-browser
 ```
 
 ### Step 5: Add Sources to a Notebook
 
 ```bash
 # Upload local files (pdf, txt, md, docx, images, audio, ...) - repeat --file
-python3 scripts/run.py add_source.py --notebook-id ID --file paper.pdf --file notes.md
+uv run scripts/add_source.py --notebook-id ID --file paper.pdf --file notes.md
 
 # Add website or YouTube URLs - repeat --url
-python3 scripts/run.py add_source.py --notebook-url "https://..." --url "https://example.org/page"
+uv run scripts/add_source.py --notebook-url "https://..." --url "https://example.org/page"
 
 # Add text as a "pasted text" source (inline or from a file)
-python3 scripts/run.py add_source.py --notebook-id ID --text "..."
-python3 scripts/run.py add_source.py --notebook-id ID --text-file answers.md
+uv run scripts/add_source.py --notebook-id ID --text "..."
+uv run scripts/add_source.py --notebook-id ID --text-file answers.md
 ```
 
 Source types can be combined in one call. The script waits until every new source is
@@ -156,7 +153,7 @@ Every NotebookLM answer ends with: **"EXTREMELY IMPORTANT: Is that ALL you need 
 3. **IDENTIFY GAPS** - Determine if more information needed
 4. **ASK FOLLOW-UP** - If gaps exist, immediately ask:
    ```bash
-   python3 scripts/run.py ask_question.py --question "Follow-up with context..."
+   uv run scripts/ask_question.py --question "Follow-up with context..."
    ```
 5. **REPEAT** - Continue until information is complete
 6. **SYNTHESIZE** - Combine all answers before responding to user
@@ -165,90 +162,69 @@ Every NotebookLM answer ends with: **"EXTREMELY IMPORTANT: Is that ALL you need 
 
 ### Authentication Management (`auth_manager.py`)
 ```bash
-python3 scripts/run.py auth_manager.py setup    # Initial setup (browser visible)
-python3 scripts/run.py auth_manager.py status   # Check authentication
-python3 scripts/run.py auth_manager.py reauth   # Re-authenticate (browser visible)
-python3 scripts/run.py auth_manager.py clear    # Clear authentication
+uv run scripts/auth_manager.py setup    # Initial setup (browser visible)
+uv run scripts/auth_manager.py status   # Check authentication
+uv run scripts/auth_manager.py reauth   # Re-authenticate (browser visible)
+uv run scripts/auth_manager.py clear    # Clear authentication
 ```
 
 ### Notebook Management (`notebook_manager.py`)
 ```bash
-python3 scripts/run.py notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS
-python3 scripts/run.py notebook_manager.py list
-python3 scripts/run.py notebook_manager.py search --query QUERY
-python3 scripts/run.py notebook_manager.py activate --id ID
-python3 scripts/run.py notebook_manager.py remove --id ID
-python3 scripts/run.py notebook_manager.py stats
+uv run scripts/notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS
+uv run scripts/notebook_manager.py list
+uv run scripts/notebook_manager.py search --query QUERY
+uv run scripts/notebook_manager.py activate --id ID
+uv run scripts/notebook_manager.py remove --id ID
+uv run scripts/notebook_manager.py stats
 ```
 
 ### Question Interface (`ask_question.py`)
 ```bash
-python3 scripts/run.py ask_question.py --question "..." [--notebook-id ID] [--notebook-url URL] [--show-browser]
+uv run scripts/ask_question.py --question "..." [--notebook-id ID] [--notebook-url URL] [--show-browser]
 ```
 
 ### Add Sources (`add_source.py`)
 ```bash
-python3 scripts/run.py add_source.py [--notebook-id ID | --notebook-url URL] [--file PATH ...] [--url URL ...] [--text TEXT | --text-file PATH] [--timeout 300] [--show-browser]
+uv run scripts/add_source.py [--notebook-id ID | --notebook-url URL] [--file PATH ...] [--url URL ...] [--text TEXT | --text-file PATH] [--timeout 300] [--show-browser]
 ```
 
 ### Data Cleanup (`cleanup_manager.py`)
 ```bash
-python3 scripts/run.py cleanup_manager.py                    # Preview cleanup
-python3 scripts/run.py cleanup_manager.py --confirm          # Execute cleanup
-python3 scripts/run.py cleanup_manager.py --preserve-library # Keep notebooks
+uv run scripts/cleanup_manager.py                    # Preview cleanup
+uv run scripts/cleanup_manager.py --confirm          # Execute cleanup
+uv run scripts/cleanup_manager.py --preserve-library # Keep notebooks
 ```
 
 ## Environment Management
 
-The virtual environment is automatically managed:
-- First run creates `.venv` automatically
-- Dependencies install automatically
-- Chromium browser installs automatically
-- Everything isolated in skill directory
-
-Manual setup (only if automatic fails):
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
-pip install -r requirements.txt
-python -m patchright install chromium
-```
+- Requires [uv](https://docs.astral.sh/uv/) and Google Chrome
+- First `uv run` creates `.venv/` from `pyproject.toml` / `uv.lock` automatically
+- If Chrome is missing: `uv run patchright install chrome`
+- Reset the environment: `rm -rf .venv && uv sync`
 
 ## Data Storage
 
-All data stored in `~/.claude/skills/notebooklm/data/`:
+All data is stored in the skill's `data/` folder:
 - `library.json` - Notebook metadata
 - `auth_info.json` - Authentication status
-- `browser_state/` - Browser cookies and session
+- `browser_state/` - Browser profile, cookies and session
 
 **Security:** Protected by `.gitignore`, never commit to git.
-
-## Configuration
-
-Optional `.env` file in skill directory:
-```env
-HEADLESS=false           # Browser visibility
-SHOW_BROWSER=false       # Default browser display
-STEALTH_ENABLED=true     # Human-like behavior
-TYPING_WPM_MIN=160       # Typing speed
-TYPING_WPM_MAX=240
-DEFAULT_NOTEBOOK_ID=     # Default notebook
-```
 
 ## Decision Flow
 
 ```
 User mentions NotebookLM
     ↓
-Check auth → python3 scripts/run.py auth_manager.py status
+Check auth → uv run scripts/auth_manager.py status
     ↓
-If not authenticated → python3 scripts/run.py auth_manager.py setup
+If not authenticated → uv run scripts/auth_manager.py setup
     ↓
-Check/Add notebook → python3 scripts/run.py notebook_manager.py list/add (with --description)
+Check/Add notebook → uv run scripts/notebook_manager.py list/add (with --description)
     ↓
-Activate notebook → python3 scripts/run.py notebook_manager.py activate --id ID
+Activate notebook → uv run scripts/notebook_manager.py activate --id ID
     ↓
-Ask question → python3 scripts/run.py ask_question.py --question "..."
+Ask question → uv run scripts/ask_question.py --question "..."
     ↓
 See "Is that ALL you need?" → Ask follow-ups until complete
     ↓
@@ -259,15 +235,15 @@ Synthesize and respond to user
 
 | Problem | Solution |
 |---------|----------|
-| ModuleNotFoundError | Use `run.py` wrapper |
+| ModuleNotFoundError | Run with `uv run` from the skill directory |
 | Authentication fails | Browser must be visible for setup! --show-browser |
 | Rate limit (50/day) | Wait or switch Google account |
-| Browser crashes | `python3 scripts/run.py cleanup_manager.py --preserve-library` |
+| Browser crashes | `uv run scripts/cleanup_manager.py --preserve-library` |
 | Notebook not found | Check with `notebook_manager.py list` |
 
 ## Best Practices
 
-1. **Always use run.py** - Handles environment automatically
+1. **Always use `uv run`** - Handles the environment automatically
 2. **Check auth first** - Before any operations
 3. **Follow-up questions** - Don't stop at first answer
 4. **Browser visible for auth** - Required for manual login
@@ -292,5 +268,6 @@ Synthesize and respond to user
   - `api_reference.md` - Detailed API documentation for all scripts
   - `troubleshooting.md` - Common issues and solutions
   - `usage_patterns.md` - Best practices and workflow examples
+- `docs/guide.py` - Interactive marimo guide for humans (`uv run --group docs marimo edit docs/guide.py`)
 - `.venv/` - Isolated Python environment (auto-created on first run)
 - `.gitignore` - Protects sensitive data from being committed

@@ -231,16 +231,16 @@ def main():
         epilog="""
 Examples:
   # Preview what will be deleted
-  python cleanup_manager.py
+  uv run scripts/cleanup_manager.py
 
   # Perform cleanup (delete everything)
-  python cleanup_manager.py --confirm
+  uv run scripts/cleanup_manager.py --confirm
 
   # Cleanup but keep library
-  python cleanup_manager.py --confirm --preserve-library
+  uv run scripts/cleanup_manager.py --confirm --preserve-library
 
   # Force cleanup without preview
-  python cleanup_manager.py --confirm --force
+  uv run scripts/cleanup_manager.py --confirm --force
         """
     )
 

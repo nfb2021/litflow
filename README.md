@@ -13,5 +13,6 @@ git clone git@github.com:nfb2021/skills.git ~/src/skills
 ln -s ~/src/skills/gemini_notebook ~/.claude/skills/gemini_notebook
 ```
 
-Then run `python3 scripts/run.py auth_manager.py setup` inside the skill folder once to log in
-(the first run creates `.venv/`; login data stays in the ignored `data/` folder).
+Each skill has its own README with setup steps. Skills with Python code use
+[uv](https://docs.astral.sh/uv/): run `uv sync` in the skill folder once; data such as
+logins stays in the skill's git-ignored `data/` folder.

@@ -66,6 +66,22 @@ def _bottom_most_response(page, selectors):
 
 
 
+def clean_answer(answer):
+    """Turn the raw inner_text() of an answer bubble into readable text"""
+    # Strip NotebookLM's collapsible "Thoughts" reasoning widget, which
+    # inner_text() captures as literal text at the top of the message
+    # (e.g. "Thoughts\nexpand_more\n...reasoning...\nmore_horiz\n<actual answer>")
+    answer = re.sub(r'^Thoughts\s+expand_more\s+', '', answer)
+
+    # Citation chips render as their own lines ("\n1\nmore_horiz\n.") - fold
+    # them back inline as " [1]" and drop the chip's icon text.
+    answer = re.sub(r'\n?more_horiz(?=\n|$)', '', answer)
+    answer = re.sub(r'\n(\d+(?:\s*[-–,]\s*\d+)*)(?=\n|$)', r' [\1]', answer)
+    answer = re.sub(r'\] \[', '][', answer)
+    answer = re.sub(r'(\])\n(?=[.,;:!?)])', r'\1', answer)
+    return answer
+
+
 FOLLOW_UP_REMINDER = (
     "\n\nEXTREMELY IMPORTANT: Is that ALL you need to know? "
     "You can always ask another question! Think about it carefully: "
@@ -90,7 +106,7 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
     auth = AuthManager()
 
     if not auth.is_authenticated():
-        print("⚠️ Not authenticated. Run: python auth_manager.py setup")
+        print("⚠️ Not authenticated. Run: uv run scripts/auth_manager.py setup")
         return None
 
     print(f"💬 Asking: {question}")
@@ -202,17 +218,7 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
             print("  ❌ Timeout waiting for answer")
             return None
 
-        # Strip NotebookLM's collapsible "Thoughts" reasoning widget, which
-        # inner_text() captures as literal text at the top of the message
-        # (e.g. "Thoughts\nexpand_more\n...reasoning...\nmore_horiz\n<actual answer>")
-        answer = re.sub(r'^Thoughts\s+expand_more\s+', '', answer)
-
-        # Citation chips render as their own lines ("\n1\nmore_horiz\n.") - fold
-        # them back inline as " [1]" and drop the chip's icon text.
-        answer = re.sub(r'\n?more_horiz(?=\n|$)', '', answer)
-        answer = re.sub(r'\n(\d+(?:\s*[-–,]\s*\d+)*)(?=\n|$)', r' [\1]', answer)
-        answer = re.sub(r'\] \[', '][', answer)
-        answer = re.sub(r'(\])\n(?=[.,;:!?)])', r'\1', answer)
+        answer = clean_answer(answer)
 
         print("  ✅ Got answer!")
         # Add follow-up reminder to encourage Claude to ask more questions
@@ -278,10 +284,10 @@ def main():
                     mark = " [ACTIVE]" if nb.get('id') == library.active_notebook_id else ""
                     print(f"  {nb['id']}: {nb['name']}{mark}")
                 print("\nSpecify with --notebook-id or set active:")
-                print("python scripts/run.py notebook_manager.py activate --id ID")
+                print("uv run scripts/notebook_manager.py activate --id ID")
             else:
                 print("❌ No notebooks in library. Add one first:")
-                print("python scripts/run.py notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS")
+                print("uv run scripts/notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS")
             return 1
 
     # Ask the question

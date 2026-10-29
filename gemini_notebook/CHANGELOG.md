@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-10-29
+
+Fork: [nfb2021/skills](https://github.com/nfb2021/skills) → `gemini_notebook/`
+
+### Added
+- `add_source.py` - add local files, website / YouTube URLs and pasted text to a notebook;
+  waits for processing and reports each source as ready / failed
+- `--timeout` option for `ask_question.py`
+- `docs/guide.py` - interactive marimo guide (`uv run --group docs marimo edit docs/guide.py`)
+- `clean_answer()` in `ask_question.py` (answer clean-up as a reusable function)
+
+### Changed
+- **uv** replaces pip: `pyproject.toml` + `uv.lock`; run scripts with `uv run scripts/<script>.py`.
+  Removed `run.py`, `setup_environment.py`, `requirements.txt` and the unused `python-dotenv`
+- Headless browser uses a 1600×1000 viewport (full three-panel layout)
+- Docs updated for the Gemini Notebook name; README rewritten
+
+### Fixed
+- Google rebrand `notebooklm.google.com` → `notebook.google.com` (login and queries)
+- Login detection requires a Google session cookie (no false "already authenticated")
+- Stale answers: the newest answer is found by on-screen position (chat list is virtualized)
+- Progress placeholders ("Thoughts", "Listed files…", "…ing...") no longer returned as answers
+- Citation chips folded into inline `[n]` references
+- Feature-announcement popups are closed before typing
+
 ## [1.3.0] - 2025-11-21
 
 ### Added

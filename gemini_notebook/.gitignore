@@ -72,3 +72,6 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+
+# marimo
+__marimo__/
