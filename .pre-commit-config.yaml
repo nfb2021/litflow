@@ -21,6 +21,11 @@ repos:
         args: [--project, zotero]
         files: ^zotero/(pyproject\.toml|uv\.lock)$
 
+      - id: uv-lock
+        name: uv lock (obsidian)
+        args: [--project, obsidian]
+        files: ^obsidian/(pyproject\.toml|uv\.lock)$
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -58,3 +63,9 @@ repos:
         entry: uv run --locked --project zotero --group docs marimo check
         language: system
         files: ^zotero/docs/.*\.py$
+      - id: pytest-obsidian
+        name: pytest (obsidian)
+        entry: uv run --locked --project obsidian --group dev pytest -q obsidian/tests
+        language: system
+        pass_filenames: false
+        files: ^obsidian/
