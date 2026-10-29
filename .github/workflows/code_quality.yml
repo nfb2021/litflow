@@ -72,3 +72,30 @@ jobs:
           zot add --dry-run 10.1000/x && exit 1 || test $? -eq 1
       - name: Run the marimo guide headless
         run: uv run --locked --group docs python docs/guide.py
+
+  obsidian:
+    name: obsidian
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: obsidian
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Check uv.lock is up to date
+        run: uv lock --check
+      - name: Run the tests (pypdf fallback, no poppler)
+        run: uv run --locked --group dev pytest -q
+      - name: Install obs as a uv tool, like a user would
+        run: uv tool install .
+      - name: Smoke test the CLI in a fresh vault
+        run: |
+          obs --version
+          obs init "$RUNNER_TEMP/vault" --title smoke
+          cd "$RUNNER_TEMP/vault"
+          obs status
+          obs lint --gate | grep -q '"verdict": "pass"'
+          obs statement add "Smoke statement for CI"
+          obs claim add -p missing -s S-0001 -q "nothing" -r origin --by ci && exit 1 || test $? -eq 1
