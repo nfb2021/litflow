@@ -1,0 +1,50 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '0 6 * * 1' # Weekly on Monday at 06:00 UTC
+
+permissions: read-all
+
+jobs:
+  hooks:
+    name: hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Run the pre-commit hooks (ruff, uv lock, file checks, marimo)
+        run: uvx prek run --all-files --show-diff-on-failure
+
+  gemini_notebook:
+    name: gemini_notebook
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gemini_notebook
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+      - name: Check uv.lock is up to date
+        run: uv lock --check
+      - name: Install gnb as a uv tool, like a user would
+        run: uv tool install .
+      - name: Smoke test the CLI (no browser, empty data folder)
+        env:
+          GEMINI_NOTEBOOK_HOME: ${{ runner.temp }}/gnb-home
+        run: |
+          gnb --version
+          gnb --help
+          gnb library list
+          gnb add -n missing --text x && exit 1 || test $? -eq 1
+      - name: Run the marimo guide headless
+        env:
+          GEMINI_NOTEBOOK_HOME: ${{ runner.temp }}/gnb-home
+        run: uv run --locked --group docs python docs/guide.py
