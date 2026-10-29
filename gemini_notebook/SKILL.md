@@ -1,5 +1,5 @@
 ---
-name: notebooklm
+name: gemini_notebook
 description: Use this skill to query your Google Gemini Notebook (formerly NotebookLM) notebooks directly from Claude Code for source-grounded, citation-backed answers from Gemini, and to add sources (files, websites, YouTube, pasted text) to them. Browser automation, library management, persistent auth. Drastically reduced hallucinations through document-only responses.
 ---
 
