@@ -122,7 +122,8 @@ def status():
         total = zot.call("search_library", limit=1)["pagination"]["total"]
         typer.echo(f"   items:  {total}")
     except (ZoteroError, KeyError, TypeError):
-        pass
+        # The item count is informational; status still reports reachability and write access.
+        typer.echo("   items:  ? (search_library did not answer)")
     if WRITE_TOOLS <= tools:
         typer.echo("✅ Write operations enabled (zot add works)")
     else:
