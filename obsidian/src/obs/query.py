@@ -8,7 +8,7 @@ import sqlite3
 
 from obs.vault import LINK_FIELDS, Note, Vault, VaultError
 
-_FILTER = re.compile(r"^([\w.-]+)(!=|~|=|>=|<=|>|<)(.*)$")
+_FILTER = re.compile(r"^([\w.-]+)([!<>]=|[=~<>])(.*)$")
 
 
 def _values(note: Note, key: str) -> list[str]:

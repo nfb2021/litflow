@@ -166,7 +166,8 @@ def status(vault: Path = VaultOpt, as_json: bool = JsonOpt) -> None:
         "lint": lint.summary(lint.lint(v)),
     }
     if as_json:
-        return emit(data)
+        emit(data)
+        return
     typer.echo(f"vault: {data['vault']}")
     typer.echo("  " + "  ".join(f"{t}s: {n}" for t, n in counts.items()))
     typer.echo(
@@ -397,7 +398,8 @@ def statement_find(text: str, vault: Path = VaultOpt, as_json: bool = JsonOpt) -
     v = open_vault(vault)
     hits = similar(v, text, limit=10)
     if as_json:
-        return emit([{"score": s, "id": i, "text": t} for s, i, t in hits])
+        emit([{"score": s, "id": i, "text": t} for s, i, t in hits])
+        return
     for s, i, t in hits:
         typer.echo(f"{i}\t{s}\t{t}")
 
@@ -411,7 +413,8 @@ def trace(statement: str, vault: Path = VaultOpt, as_json: bool = JsonOpt) -> No
     except VaultError as e:
         fail(str(e))
     if as_json:
-        return emit(t)
+        emit(t)
+        return
     typer.echo(provenance.render(t))
 
 
@@ -836,7 +839,7 @@ def frontier(
     except VaultError as e:
         fail(str(e))
     if as_json:
-        return emit(
+        emit(
             [
                 {
                     "id": q.id,
@@ -848,6 +851,7 @@ def frontier(
                 for q in qs
             ]
         )
+        return
     for q in qs:
         human = "  [needs human]" if q.fm.get("kind") in HUMAN_KINDS else ""
         typer.echo(f"{q.id}\t{q.fm.get('kind')}\t{q.title}{human}")
@@ -1013,7 +1017,7 @@ def glossary(vault: Path = VaultOpt, as_json: bool = JsonOpt) -> None:
     v = open_vault(vault)
     terms = sorted(v.of_type("concept"), key=lambda n: n.title.lower())
     if as_json:
-        return emit(
+        emit(
             [
                 {
                     "id": t.id,
@@ -1024,6 +1028,7 @@ def glossary(vault: Path = VaultOpt, as_json: bool = JsonOpt) -> None:
                 for t in terms
             ]
         )
+        return
     for t in terms:
         aka = (
             f" (aka {', '.join(t.fm.get('aliases', []))})"
@@ -1074,7 +1079,7 @@ def ls(
         fail(str(e))
     cols = [f for f in fields.split(",") if f]
     if as_json:
-        return emit(
+        emit(
             [
                 {
                     "id": n.id,
@@ -1084,6 +1089,7 @@ def ls(
                 for n in notes
             ]
         )
+        return
     for n in notes:
         extra = "\t".join(str(n.fm.get(c, "")) for c in cols)
         typer.echo(
@@ -1101,7 +1107,7 @@ def show(note_id: str, vault: Path = VaultOpt, as_json: bool = JsonOpt) -> None:
         fail(str(e))
     back = [(b.id, b.type, f) for b, f in v.backlinks(n.id)]
     if as_json:
-        return emit(
+        emit(
             {
                 "id": n.id,
                 "type": n.type,
@@ -1111,6 +1117,7 @@ def show(note_id: str, vault: Path = VaultOpt, as_json: bool = JsonOpt) -> None:
                 "backlinks": [{"id": i, "type": t, "field": f} for i, t, f in back],
             }
         )
+        return
     typer.echo(n.path.read_text(encoding="utf-8"))
     if back:
         typer.echo("backlinks:")
@@ -1132,12 +1139,13 @@ def neighbors(
     except VaultError as e:
         fail(str(e))
     if as_json:
-        return emit(
+        emit(
             {
                 k: [{"dir": d, "field": f, "note": o} for d, f, o in e]
                 for k, e in edges.items()
             }
         )
+        return
     for nid, es in edges.items():
         for d, f, o in es:
             other = v.notes.get(o)
@@ -1159,7 +1167,8 @@ def sql_cmd(statement: str, vault: Path = VaultOpt, as_json: bool = JsonOpt) -> 
     except (VaultError, Exception) as e:
         fail(str(e))
     if as_json:
-        return emit([dict(zip(cols, r, strict=False)) for r in rows])
+        emit([dict(zip(cols, r, strict=False)) for r in rows])
+        return
     typer.echo("\t".join(cols))
     for r in rows:
         typer.echo("\t".join("" if x is None else str(x) for x in r))
