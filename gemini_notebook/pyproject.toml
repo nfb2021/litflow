@@ -6,7 +6,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
-    "patchright==1.55.2",
+    "patchright==1.64.3",
     "platformdirs>=4",
     "typer>=0.12",
 ]
