@@ -5,16 +5,19 @@ Collection of Claude Code skills.
 | Skill | Description |
 |---|---|
 | [`gemini_notebook`](gemini_notebook/) | Query Google Gemini Notebook (formerly NotebookLM) notebooks from Claude Code and add sources (files, websites, YouTube, pasted text) to them. Fork of [PleasePrompto/notebooklm-skill](https://github.com/PleasePrompto/notebooklm-skill) (MIT) with fixes for the `notebook.google.com` rebrand. Comes with the `gnb` command. |
+| [`zotero`](zotero/) | Import papers into Zotero by DOI with their PDFs, list a collection's PDFs, extract the DOIs papers cite, and upload PDFs to a Gemini Notebook. Drives the Zotero desktop app through the [Zotero MCP plugin](https://github.com/cookjohn/zotero-mcp). Comes with the `zot` command. |
 
 ## Install a skill
 
 ```bash
 git clone git@github.com:nfb2021/skills.git ~/src/skills
 ln -s ~/src/skills/gemini_notebook ~/.claude/skills/gemini_notebook
+ln -s ~/src/skills/zotero ~/.claude/skills/zotero
 ```
 
 Each skill has its own README with setup steps. Skills with Python code are uv projects;
-`gemini_notebook` installs its command with `uv tool install --editable ~/src/skills/gemini_notebook`.
+each installs its command with `uv tool install --editable ~/src/skills/<skill>`
+(`gnb` for `gemini_notebook`, `zot` for `zotero`).
 Logins and other personal data are stored outside the repository.
 
 ## Contributing
