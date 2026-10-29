@@ -41,7 +41,7 @@ But **Python's Playwright API doesn't support this** ([#14949](https://github.co
 context = playwright.chromium.launch_persistent_context(
     user_data_dir=profile_dir,
     storage_state="state.json",  # ← Parameter not available in Python!
-    channel="chrome"
+    channel="chrome",
 )
 ```
 
@@ -59,8 +59,7 @@ We use a **two-phase authentication system**:
 
 ```python
 context = playwright.chromium.launch_persistent_context(
-    user_data_dir="browser_profile/",
-    channel="chrome"
+    user_data_dir="browser_profile/", channel="chrome"
 )
 # User logs in...
 context.storage_state(path="state.json")  # Save all cookies
@@ -74,14 +73,13 @@ context.storage_state(path="state.json")  # Save all cookies
 ```python
 # Step 1: Launch with browser profile
 context = playwright.chromium.launch_persistent_context(
-    user_data_dir="browser_profile/",
-    channel="chrome"
+    user_data_dir="browser_profile/", channel="chrome"
 )
 
 # Step 2: Manually inject cookies from state.json
-with open("state.json", 'r') as f:
+with open("state.json", "r") as f:
     state = json.load(f)
-    context.add_cookies(state['cookies'])  # ← Workaround for session cookies!
+    context.add_cookies(state["cookies"])  # ← Workaround for session cookies!
 ```
 
 ## Benefits
@@ -98,7 +96,7 @@ with open("state.json", 'r') as f:
 ## File Structure
 
 ```
-~/.claude/skills/gemini_notebook/data/
+~/Library/Application Support/gemini-notebook/   # macOS; $GEMINI_NOTEBOOK_HOME overrides
 ├── auth_info.json              # Metadata about authentication
 ├── browser_state/
 │   ├── state.json             # Cookies + localStorage (for manual injection)
@@ -120,17 +118,12 @@ Even though we use `user_data_dir`, we **still need `state.json`** because:
 
 ## Code References
 
-**Setup:** `scripts/auth_manager.py:94-120`
-- Lines 100-113: Launch persistent context with `channel="chrome"`
-- Line 167: Save to `state.json` via `context.storage_state()`
-
-**Runtime:** `scripts/ask_question.py:77-118`
-- Lines 86-99: Launch persistent context
-- Lines 101-118: Manual cookie injection workaround
-
-**Validation:** `scripts/auth_manager.py:236-298`
-- Lines 262-275: Launch persistent context
-- Lines 277-287: Manual cookie injection for validation
+- **Launch + cookie injection:** `BrowserFactory.launch_persistent_context()` and
+  `_inject_cookies()` in `src/gemini_notebook/browser.py` (`channel="chrome"`, then
+  cookies from `state.json`). Every command that opens a browser goes through it.
+- **Setup:** `AuthManager.setup_auth()` in `src/gemini_notebook/auth.py`; saves
+  `state.json` via `context.storage_state()` once a Google session cookie exists.
+- **Validation:** `AuthManager.validate_auth()` in the same file (`gnb auth validate`).
 
 ## Related Issues
 
@@ -147,7 +140,7 @@ If Playwright adds support for `storage_state` parameter in Python's `launch_per
 context = playwright.chromium.launch_persistent_context(
     user_data_dir="browser_profile/",
     storage_state="state.json",  # ← Would handle everything automatically!
-    channel="chrome"
+    channel="chrome",
 )
 ```
 

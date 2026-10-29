@@ -1,0 +1,51 @@
+# Run with prek (or pre-commit):  uvx prek install --hook-type pre-commit --hook-type commit-msg --hook-type pre-push
+# CI runs the same hooks: uvx prek run --all-files
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.17.3
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.13.6
+    hooks:
+      # Keep each skill's uv.lock in step with its pyproject.toml
+      - id: uv-lock
+        name: uv lock (gemini_notebook)
+        args: [--project, gemini_notebook]
+        files: ^gemini_notebook/(pyproject\.toml|uv\.lock)$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.19.3
+    hooks:
+      # Conventional commits, scope = skill: feat(gemini_notebook): ...
+      - id: commitizen
+        stages: [commit-msg]
+
+  - repo: https://github.com/GitGuardian/ggshield
+    rev: v1.56.1
+    hooks:
+      # Secret scan before anything leaves the machine; needs `uvx ggshield auth login` once
+      - id: ggshield-push
+        stages: [pre-push]
+
+  - repo: local
+    hooks:
+      - id: marimo-check
+        name: marimo check
+        entry: uv run --locked --project gemini_notebook --group docs marimo check
+        language: system
+        files: ^gemini_notebook/docs/.*\.py$

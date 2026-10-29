@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Add sources to a Gemini Notebook (formerly NotebookLM) notebook
 
@@ -8,24 +7,24 @@ Supports the three source types of the "Add sources" dialog:
 - pasted text
 """
 
-import argparse
-import sys
 import time
 from pathlib import Path
 
 from patchright.sync_api import sync_playwright
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent))
-
-from auth_manager import AuthManager
-from notebook_manager import NotebookLibrary
-from config import (
-    ADD_SOURCE_BUTTON, SOURCE_ACTION_BUTTON, URL_INPUT, TEXT_INPUT,
-    INSERT_BUTTON, SOURCE_ROW, SOURCE_ROW_TITLE, SOURCE_ROW_READY,
-    SOURCE_ROW_ERROR_CLASS
+from .auth import AuthManager
+from .browser import BrowserFactory, StealthUtils
+from .config import (
+    ADD_SOURCE_BUTTON,
+    INSERT_BUTTON,
+    SOURCE_ACTION_BUTTON,
+    SOURCE_ROW,
+    SOURCE_ROW_ERROR_CLASS,
+    SOURCE_ROW_READY,
+    SOURCE_ROW_TITLE,
+    TEXT_INPUT,
+    URL_INPUT,
 )
-from browser_utils import BrowserFactory, StealthUtils
 
 
 def _source_rows(page):
@@ -33,7 +32,9 @@ def _source_rows(page):
     rows = []
     for row in page.query_selector_all(SOURCE_ROW):
         title_el = row.query_selector(SOURCE_ROW_TITLE)
-        title = (title_el.get_attribute("aria-label") if title_el else None) or row.inner_text().strip()
+        title = (
+            title_el.get_attribute("aria-label") if title_el else None
+        ) or row.inner_text().strip()
         if SOURCE_ROW_ERROR_CLASS in (row.get_attribute("class") or ""):
             status = "failed"
         elif row.query_selector(SOURCE_ROW_READY):
@@ -84,8 +85,9 @@ def _wait_for_sources(page, before, expected, timeout):
     return new
 
 
-def add_sources(notebook_url, files=None, urls=None, text=None,
-                headless=True, timeout=300):
+def add_sources(
+    notebook_url, files=None, urls=None, text=None, headless=True, timeout=300
+):
     """
     Add sources to a notebook
 
@@ -110,7 +112,7 @@ def add_sources(notebook_url, files=None, urls=None, text=None,
 
     auth = AuthManager()
     if not auth.is_authenticated():
-        print("⚠️ Not authenticated. Run: uv run scripts/auth_manager.py setup")
+        print("⚠️ Not authenticated. Run: gnb auth setup")
         return None
 
     print(f"📚 Notebook: {notebook_url}")
@@ -120,7 +122,9 @@ def add_sources(notebook_url, files=None, urls=None, text=None,
 
     try:
         playwright = sync_playwright().start()
-        context = BrowserFactory.launch_persistent_context(playwright, headless=headless)
+        context = BrowserFactory.launch_persistent_context(
+            playwright, headless=headless
+        )
 
         page = context.new_page()
         print("  🌐 Opening notebook...")
@@ -160,9 +164,13 @@ def add_sources(notebook_url, files=None, urls=None, text=None,
 
         ready = sum(status == "ready" for _, status in new)
         if len(new) < expected:
-            print(f"  ⚠️ Only {len(new)} of {expected} new source(s) appeared within {timeout}s")
+            print(
+                f"  ⚠️ Only {len(new)} of {expected} new source(s) appeared within {timeout}s"
+            )
         elif ready < len(new):
-            print(f"  ⚠️ {len(new) - ready} of {len(new)} new source(s) failed or are still processing")
+            print(
+                f"  ⚠️ {len(new) - ready} of {len(new)} new source(s) failed or are still processing"
+            )
         else:
             print(f"  ✅ Added {len(new)} source(s)")
         return new
@@ -170,6 +178,7 @@ def add_sources(notebook_url, files=None, urls=None, text=None,
     except Exception as e:
         print(f"  ❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
         return None
 
@@ -177,74 +186,10 @@ def add_sources(notebook_url, files=None, urls=None, text=None,
         if context:
             try:
                 context.close()
-            except:
-                pass
+            except Exception:
+                pass  # already closed / stopped
         if playwright:
             try:
                 playwright.stop()
-            except:
-                pass
-
-
-def main():
-    parser = argparse.ArgumentParser(description='Add sources to a Gemini Notebook notebook')
-
-    parser.add_argument('--notebook-url', help='Notebook URL')
-    parser.add_argument('--notebook-id', help='Notebook ID from library')
-    parser.add_argument('--file', action='append', default=[], help='Local file to upload (repeatable)')
-    parser.add_argument('--url', action='append', default=[], help='Website or YouTube URL (repeatable)')
-    parser.add_argument('--text', help='Text to add as a pasted-text source')
-    parser.add_argument('--text-file', help='Add the contents of this file as a pasted-text source')
-    parser.add_argument('--show-browser', action='store_true', help='Show browser')
-    parser.add_argument('--timeout', type=int, default=300, help='Seconds to wait for processing (default 300)')
-
-    args = parser.parse_args()
-
-    text = args.text
-    if args.text_file:
-        text = Path(args.text_file).expanduser().read_text()
-
-    if not (args.file or args.url or text):
-        parser.error("give at least one of --file, --url, --text, --text-file")
-
-    # Resolve notebook URL
-    notebook_url = args.notebook_url
-    library = NotebookLibrary()
-
-    if not notebook_url and args.notebook_id:
-        notebook = library.get_notebook(args.notebook_id)
-        if not notebook:
-            print(f"❌ Notebook '{args.notebook_id}' not found")
-            return 1
-        notebook_url = notebook['url']
-
-    if not notebook_url:
-        active = library.get_active_notebook()
-        if not active:
-            print("❌ No notebook given. Use --notebook-url or --notebook-id")
-            return 1
-        notebook_url = active['url']
-        print(f"📚 Using active notebook: {active['name']}")
-
-    new = add_sources(
-        notebook_url,
-        files=args.file,
-        urls=args.url,
-        text=text,
-        headless=not args.show_browser,
-        timeout=args.timeout
-    )
-
-    if new is None:
-        print("\n❌ Failed to add sources")
-        return 1
-
-    print("\nNew sources:")
-    for title, status in new:
-        mark = {"ready": "✓", "failed": "✗"}.get(status, "…")
-        print(f"  {mark} {title} ({status})")
-    return 0 if new and all(status == "ready" for _, status in new) else 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+            except Exception:
+                pass  # already closed / stopped

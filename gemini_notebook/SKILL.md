@@ -5,147 +5,92 @@ description: Use this skill to query your Google Gemini Notebook (formerly Noteb
 
 # Gemini Notebook (NotebookLM) Research Assistant Skill
 
-Interact with Google NotebookLM to query documentation with Gemini's source-grounded answers. Each question opens a fresh browser session, retrieves the answer exclusively from your uploaded documents, and closes.
+Query Google Gemini Notebook (formerly NotebookLM) for answers drawn only from a notebook's
+sources, and add sources to notebooks. Everything goes through the `gnb` command. Each
+question opens a fresh headless Chrome, gets the answer and closes it.
 
 ## When to Use This Skill
 
 Trigger when user:
-- Mentions NotebookLM explicitly
-- Mentions Gemini Notebook (NotebookLM's new name)
+- Mentions NotebookLM or Gemini Notebook (NotebookLM's new name)
 - Shares a notebook URL (`https://notebook.google.com/notebook/...`, formerly `notebooklm.google.com`)
 - Asks to query their notebooks/documentation
-- Wants to add documentation to NotebookLM library
+- Wants to add a notebook to the library
 - Wants to upload / add sources (files, websites, YouTube, pasted text) to a notebook
 - Uses phrases like "ask my NotebookLM", "check my docs", "query my notebook"
 
-## ⚠️ CRITICAL: Add Command - Smart Discovery
-
-When user wants to add a notebook without providing details:
-
-**SMART ADD (Recommended)**: Query the notebook first to discover its content:
-```bash
-# Step 1: Query the notebook about its content
-uv run scripts/ask_question.py --question "What is the content of this notebook? What topics are covered? Provide a complete overview briefly and concisely" --notebook-url "[URL]"
-
-# Step 2: Use the discovered information to add it
-uv run scripts/notebook_manager.py add --url "[URL]" --name "[Based on content]" --description "[Based on content]" --topics "[Based on content]"
-```
-
-**MANUAL ADD**: If user provides all details:
-- `--url` - The NotebookLM URL
-- `--name` - A descriptive name
-- `--description` - What the notebook contains (REQUIRED!)
-- `--topics` - Comma-separated topics (REQUIRED!)
-
-NEVER guess or use generic descriptions! If details missing, use Smart Add to discover them.
-
-## Critical: Run Scripts with uv from the Skill Directory
-
-**ALWAYS `cd` into this skill's directory and run scripts with `uv run scripts/<script>.py`:**
+## Step 0: Make Sure `gnb` Is Installed
 
 ```bash
-# ✅ CORRECT
-cd <skill directory> && uv run scripts/auth_manager.py status
-uv run scripts/notebook_manager.py list
-uv run scripts/ask_question.py --question "..."
-
-# ❌ WRONG - system Python has no patchright
-python3 scripts/auth_manager.py status
+command -v gnb || uv tool install --editable <this skill's directory>
 ```
 
-`uv run` reads `pyproject.toml` / `uv.lock`, creates `.venv/` on first use and keeps it in
-sync. Never install anything with pip.
+`gnb` is a uv tool: it runs from any directory, no `cd` and no `uv run` needed.
+Never use pip or the system Python. If Chrome is missing: `uvx patchright install chrome`.
+
+## ⚠️ CRITICAL: Adding a Notebook - Smart Discovery
+
+When the user wants to add a notebook without giving details, ask the notebook first:
+
+```bash
+# Step 1: Ask the notebook what it contains
+gnb ask "What is the content of this notebook? What topics are covered? Provide a complete overview briefly and concisely" -n "[URL]"
+
+# Step 2: Add it with the discovered information
+gnb library add "[URL]" --name "[Based on content]" --description "[Based on content]" --topics "[Based on content]"
+```
+
+`--name`, `--description` and `--topics` (comma-separated) are all required.
+NEVER guess or use generic descriptions! If details are missing, use Smart Discovery.
 
 ## Core Workflow
 
-### Step 1: Check Authentication Status
+### Step 1: Check Authentication
 ```bash
-uv run scripts/auth_manager.py status
+gnb auth status        # exit code 1 if not logged in
 ```
-
-If not authenticated, proceed to setup.
 
 ### Step 2: Authenticate (One-Time Setup)
 ```bash
-# Browser MUST be visible for manual Google login
-uv run scripts/auth_manager.py setup
+gnb auth setup         # opens a VISIBLE Chrome window
 ```
+Tell the user: "A browser window will open for Google login". They log in manually.
 
-**Important:**
-- Browser is VISIBLE for authentication
-- Browser window opens automatically
-- User must manually log in to Google
-- Tell user: "A browser window will open for Google login"
-
-### Step 3: Manage Notebook Library
-
+### Step 3: Pick the Notebook
 ```bash
-# List all notebooks
-uv run scripts/notebook_manager.py list
-
-# BEFORE ADDING: Ask user for metadata if unknown!
-# "What does this notebook contain?"
-# "What topics should I tag it with?"
-
-# Add notebook to library (ALL parameters are REQUIRED!)
-uv run scripts/notebook_manager.py add \
-  --url "https://notebook.google.com/notebook/..." \
-  --name "Descriptive Name" \
-  --description "What this notebook contains" \  # REQUIRED - ASK USER IF UNKNOWN!
-  --topics "topic1,topic2,topic3"  # REQUIRED - ASK USER IF UNKNOWN!
-
-# Search notebooks by topic
-uv run scripts/notebook_manager.py search --query "keyword"
-
-# Set active notebook
-uv run scripts/notebook_manager.py activate --id notebook-id
-
-# Remove notebook
-uv run scripts/notebook_manager.py remove --id notebook-id
+gnb library list
+gnb library search "keyword"
+gnb library activate notebook-id     # default for later commands
 ```
 
-### Quick Workflow
-1. Check library: `uv run scripts/notebook_manager.py list`
-2. Ask question: `uv run scripts/ask_question.py --question "..." --notebook-id ID`
+`-n/--notebook` on `ask` and `add` takes a **library ID or a notebook URL**. Without it,
+the active notebook is used.
 
 ### Step 4: Ask Questions
-
 ```bash
-# Basic query (uses active notebook if set)
-uv run scripts/ask_question.py --question "Your question here"
-
-# Query specific notebook
-uv run scripts/ask_question.py --question "..." --notebook-id notebook-id
-
-# Query with notebook URL directly
-uv run scripts/ask_question.py --question "..." --notebook-url "https://..."
-
-# Show browser for debugging
-uv run scripts/ask_question.py --question "..." --show-browser
+gnb ask "Your question here"                     # active notebook
+gnb ask "..." -n notebook-id
+gnb ask "..." -n "https://notebook.google.com/notebook/..."
+gnb ask "..." --timeout 400                      # long answers (default 240 s)
+gnb ask "..." --show-browser                     # debugging
 ```
 
 ### Step 5: Add Sources to a Notebook
-
 ```bash
-# Upload local files (pdf, txt, md, docx, images, audio, ...) - repeat --file
-uv run scripts/add_source.py --notebook-id ID --file paper.pdf --file notes.md
-
-# Add website or YouTube URLs - repeat --url
-uv run scripts/add_source.py --notebook-url "https://..." --url "https://example.org/page"
-
-# Add text as a "pasted text" source (inline or from a file)
-uv run scripts/add_source.py --notebook-id ID --text "..."
-uv run scripts/add_source.py --notebook-id ID --text-file answers.md
+gnb add -n ID --file paper.pdf --file notes.md   # local files (pdf, txt, md, docx, images, audio, ...)
+gnb add -n ID --url "https://example.org/page"   # websites / YouTube, repeat --url
+gnb add -n ID --text "..."                       # pasted text
+gnb add -n ID --text-file answers.md             # pasted text from a file
 ```
 
-Source types can be combined in one call. The script waits until every new source is
+Source types can be combined in one call. `gnb add` waits until every new source is
 processed and lists each one as `ready` or `failed` (exit code 1 if any failed, e.g. a
 website Google could not import). Only add sources the user asked for: this changes
 their notebook.
 
 ## Follow-Up Mechanism (CRITICAL)
 
-Every NotebookLM answer ends with: **"EXTREMELY IMPORTANT: Is that ALL you need to know?"**
+Every answer ends with: **"EXTREMELY IMPORTANT: Is that ALL you need to know?"**
 
 **Required Claude Behavior:**
 1. **STOP** - Do not immediately respond to user
@@ -153,80 +98,54 @@ Every NotebookLM answer ends with: **"EXTREMELY IMPORTANT: Is that ALL you need 
 3. **IDENTIFY GAPS** - Determine if more information needed
 4. **ASK FOLLOW-UP** - If gaps exist, immediately ask:
    ```bash
-   uv run scripts/ask_question.py --question "Follow-up with context..."
+   gnb ask "Follow-up with full context..." -n ID
    ```
 5. **REPEAT** - Continue until information is complete
 6. **SYNTHESIZE** - Combine all answers before responding to user
 
-## Script Reference
+Each question is a new browser session, so every follow-up must carry its full context.
 
-### Authentication Management (`auth_manager.py`)
+## Command Reference
+
 ```bash
-uv run scripts/auth_manager.py setup    # Initial setup (browser visible)
-uv run scripts/auth_manager.py status   # Check authentication
-uv run scripts/auth_manager.py reauth   # Re-authenticate (browser visible)
-uv run scripts/auth_manager.py clear    # Clear authentication
+gnb ask QUESTION [-n ID|URL] [--timeout 240] [--show-browser]
+gnb add [-n ID|URL] [--file PATH ...] [--url URL ...] [--text TEXT | --text-file PATH] [--timeout 300] [--show-browser]
+
+gnb library list | stats
+gnb library add URL --name NAME --description DESC --topics "a,b" [--use-cases "..."] [--tags "..."]
+gnb library search QUERY
+gnb library activate ID
+gnb library remove ID          # removes it from the library only
+
+gnb auth status | setup | validate | reauth | clear
+
+gnb cleanup [--confirm] [--preserve-library] [--force]   # preview without --confirm
 ```
 
-### Notebook Management (`notebook_manager.py`)
-```bash
-uv run scripts/notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS
-uv run scripts/notebook_manager.py list
-uv run scripts/notebook_manager.py search --query QUERY
-uv run scripts/notebook_manager.py activate --id ID
-uv run scripts/notebook_manager.py remove --id ID
-uv run scripts/notebook_manager.py stats
-```
-
-### Question Interface (`ask_question.py`)
-```bash
-uv run scripts/ask_question.py --question "..." [--notebook-id ID] [--notebook-url URL] [--show-browser]
-```
-
-### Add Sources (`add_source.py`)
-```bash
-uv run scripts/add_source.py [--notebook-id ID | --notebook-url URL] [--file PATH ...] [--url URL ...] [--text TEXT | --text-file PATH] [--timeout 300] [--show-browser]
-```
-
-### Data Cleanup (`cleanup_manager.py`)
-```bash
-uv run scripts/cleanup_manager.py                    # Preview cleanup
-uv run scripts/cleanup_manager.py --confirm          # Execute cleanup
-uv run scripts/cleanup_manager.py --preserve-library # Keep notebooks
-```
-
-## Environment Management
-
-- Requires [uv](https://docs.astral.sh/uv/) and Google Chrome
-- First `uv run` creates `.venv/` from `pyproject.toml` / `uv.lock` automatically
-- If Chrome is missing: `uv run patchright install chrome`
-- Reset the environment: `rm -rf .venv && uv sync`
+`gnb --help` and `gnb COMMAND --help` show every option.
 
 ## Data Storage
 
-All data is stored in the skill's `data/` folder:
-- `library.json` - Notebook metadata
-- `auth_info.json` - Authentication status
-- `browser_state/` - Browser profile, cookies and session
+Login and library live in the user data folder, not in the skill directory
+(macOS: `~/Library/Application Support/gemini-notebook/`, override with `$GEMINI_NOTEBOOK_HOME`):
+- `library.json` - notebook metadata
+- `auth_info.json` - when the login happened
+- `browser_state/` - Chrome profile and cookies
 
-**Security:** Protected by `.gitignore`, never commit to git.
+`gnb auth status` prints the folder. Treat it like a password.
 
 ## Decision Flow
 
 ```
-User mentions NotebookLM
+User mentions a notebook
     ↓
-Check auth → uv run scripts/auth_manager.py status
+gnb auth status  →  not logged in?  →  gnb auth setup
     ↓
-If not authenticated → uv run scripts/auth_manager.py setup
+gnb library list  (add with Smart Discovery if missing)
     ↓
-Check/Add notebook → uv run scripts/notebook_manager.py list/add (with --description)
+gnb ask "..." -n ID
     ↓
-Activate notebook → uv run scripts/notebook_manager.py activate --id ID
-    ↓
-Ask question → uv run scripts/ask_question.py --question "..."
-    ↓
-See "Is that ALL you need?" → Ask follow-ups until complete
+See "Is that ALL you need?" → ask follow-ups until complete
     ↓
 Synthesize and respond to user
 ```
@@ -235,39 +154,29 @@ Synthesize and respond to user
 
 | Problem | Solution |
 |---------|----------|
-| ModuleNotFoundError | Run with `uv run` from the skill directory |
-| Authentication fails | Browser must be visible for setup! --show-browser |
-| Rate limit (50/day) | Wait or switch Google account |
-| Browser crashes | `uv run scripts/cleanup_manager.py --preserve-library` |
-| Notebook not found | Check with `notebook_manager.py list` |
+| `gnb: command not found` | `uv tool install --editable <skill dir>`; make sure `~/.local/bin` is on PATH (`uv tool update-shell`) |
+| `Not authenticated` | `gnb auth setup` |
+| Answers or uploads suddenly fail | `gnb auth reauth` |
+| Timeout on long answers | `--timeout 400` |
+| Rate limit (≈50/day) | Wait or switch Google account (`gnb auth reauth`) |
+| Browser crashes | `gnb cleanup --confirm --preserve-library`, then `gnb auth setup` |
+| Notebook not found | `gnb library list` |
 
-## Best Practices
-
-1. **Always use `uv run`** - Handles the environment automatically
-2. **Check auth first** - Before any operations
-3. **Follow-up questions** - Don't stop at first answer
-4. **Browser visible for auth** - Required for manual login
-5. **Include context** - Each question is independent
-6. **Synthesize answers** - Combine multiple responses
+More in `references/troubleshooting.md`.
 
 ## Limitations
 
 - No session persistence (each question = new browser)
-- Rate limits on free Google accounts (50 queries/day)
-- Sources can be added (`add_source.py`) but not removed; Google Drive / Play Books sources are not supported
+- Rate limits on free Google accounts (≈50 queries/day)
+- Sources can be added but not removed; Google Drive / Play Books sources are not supported
 - Only sources are queried; Studio notes and chat history are not
-- Browser overhead (few seconds per question)
+- Browser overhead (a few seconds per question)
 
 ## Resources (Skill Structure)
 
-**Important directories and files:**
-
-- `scripts/` - All automation scripts (ask_question.py, notebook_manager.py, etc.)
-- `data/` - Local storage for authentication and notebook library
-- `references/` - Extended documentation:
-  - `api_reference.md` - Detailed API documentation for all scripts
-  - `troubleshooting.md` - Common issues and solutions
-  - `usage_patterns.md` - Best practices and workflow examples
-- `docs/guide.py` - Interactive marimo guide for humans (`uv run --group docs marimo edit docs/guide.py`)
-- `.venv/` - Isolated Python environment (auto-created on first run)
-- `.gitignore` - Protects sensitive data from being committed
+- `src/gemini_notebook/` - the `gnb` package (`cli.py` commands, `config.py` page selectors)
+- `references/` - extended documentation:
+  - `api_reference.md` - every command, option and Python function
+  - `troubleshooting.md` - common issues and solutions
+  - `usage_patterns.md` - best practices and workflow examples
+- `docs/guide.py` - interactive marimo guide for humans (`uv run --group docs marimo edit docs/guide.py`)

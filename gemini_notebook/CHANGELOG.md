@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-10-29
+
+### Changed
+- **`gnb` command** (Typer) replaces the scripts: `gnb ask`, `gnb add`, `gnb library …`,
+  `gnb auth …`, `gnb cleanup`. Installed with `uv tool install`, runs from any directory
+- Scripts became the package `src/gemini_notebook/` (`ask`, `sources`, `library`, `auth`,
+  `cleanup`, `browser`, `config`, `cli`)
+- `-n/--notebook` takes a library ID or a notebook URL (replaces `--notebook-id` / `--notebook-url`)
+- Login and library moved from the skill's `data/` folder to the user data folder
+  (macOS `~/Library/Application Support/gemini-notebook/`), override with `$GEMINI_NOTEBOOK_HOME`
+- Skill renamed `notebooklm` → `gemini_notebook`
+
+### Removed
+- `browser_session.py` (unused)
+
 ## [2.0.0] - 2026-10-29
 
 Fork: [nfb2021/skills](https://github.com/nfb2021/skills) → `gemini_notebook/`

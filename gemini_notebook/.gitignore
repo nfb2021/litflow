@@ -19,8 +19,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-scripts/__pycache__/
-scripts/*.pyc
 
 # Environment
 .env
