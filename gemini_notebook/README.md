@@ -59,8 +59,11 @@ question, add sources, and play with the answer clean-up and placeholder detecti
 
 ```bash
 cd ~/src/skills/gemini_notebook
-uv run --group docs marimo edit docs/guide.py     # or: marimo run (app view, code hidden)
+uvx --with-editable . marimo edit docs/guide.py   # or: marimo run (app view, code hidden)
 ```
+
+`uvx` builds a throwaway environment with marimo and this package, so nothing is
+installed into your project or system Python.
 
 ## Using it with Claude
 
