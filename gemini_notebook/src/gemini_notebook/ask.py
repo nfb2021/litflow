@@ -185,7 +185,7 @@ def ask_notebook(
                     time.sleep(1)
                     continue
             except Exception:
-                pass
+                pass  # element vanished mid-check: keep polling
 
             # Find the visually bottom-most (newest) response bubble
             text, _ = _bottom_most_response(page, RESPONSE_SELECTORS)
@@ -230,10 +230,10 @@ def ask_notebook(
             try:
                 context.close()
             except Exception:
-                pass
+                pass  # already closed / stopped
 
         if playwright:
             try:
                 playwright.stop()
             except Exception:
-                pass
+                pass  # already closed / stopped

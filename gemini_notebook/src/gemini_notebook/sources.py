@@ -187,9 +187,9 @@ def add_sources(
             try:
                 context.close()
             except Exception:
-                pass
+                pass  # already closed / stopped
         if playwright:
             try:
                 playwright.stop()
             except Exception:
-                pass
+                pass  # already closed / stopped

@@ -88,7 +88,7 @@ class StealthUtils:
             try:
                 element = page.wait_for_selector(selector, timeout=2000)
             except Exception:
-                pass
+                pass  # not found in time: handled below
 
         if not element:
             print(f"⚠️ Element not found for typing: {selector}")

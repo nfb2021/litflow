@@ -123,7 +123,7 @@ class CleanupManager:
                     if item.is_file():
                         total += item.stat().st_size
             except Exception:
-                pass
+                pass  # unreadable entries: report what was counted
             return total
         return 0
 

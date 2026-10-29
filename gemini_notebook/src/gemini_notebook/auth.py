@@ -14,11 +14,17 @@ import re
 import shutil
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 from patchright.sync_api import BrowserContext, sync_playwright
 
 from .browser import BrowserFactory
 from .config import AUTH_INFO_FILE, BROWSER_STATE_DIR, DATA_DIR, STATE_FILE
+
+
+def _on_notebook_site(url: str) -> bool:
+    """True if the page is Gemini Notebook itself (not a login redirect)"""
+    return urlparse(url).hostname == "notebook.google.com"
 
 
 class AuthManager:
@@ -70,7 +76,7 @@ class AuthManager:
                     saved_info = json.load(f)
                     info.update(saved_info)
             except Exception:
-                pass
+                pass  # auth info is optional
 
         if info["state_exists"]:
             age_hours = (time.time() - self.state_file.stat().st_mtime) / 3600
@@ -112,7 +118,7 @@ class AuthManager:
             try:
                 page.wait_for_load_state("networkidle", timeout=15000)
             except Exception:
-                pass
+                pass  # page keeps polling: judge it after the sleep
             time.sleep(3)
 
             def _has_session_cookie():
@@ -122,11 +128,7 @@ class AuthManager:
                 )
 
             # Check if already authenticated
-            if (
-                "notebook.google.com" in page.url
-                and "accounts.google.com" not in page.url
-                and _has_session_cookie()
-            ):
+            if _on_notebook_site(page.url) and _has_session_cookie():
                 print("  ✅ Already authenticated!")
                 self._save_browser_state(context)
                 return True
@@ -169,13 +171,13 @@ class AuthManager:
                 try:
                     context.close()
                 except Exception:
-                    pass
+                    pass  # already closed / stopped
 
             if playwright:
                 try:
                     playwright.stop()
                 except Exception:
-                    pass
+                    pass  # already closed / stopped
 
     def _save_browser_state(self, context: BrowserContext):
         """Save browser state to disk"""
@@ -283,10 +285,7 @@ class AuthManager:
             )
 
             # Check if we can access NotebookLM
-            if (
-                "notebook.google.com" in page.url
-                and "accounts.google.com" not in page.url
-            ):
+            if _on_notebook_site(page.url):
                 print("  ✅ Authentication is valid")
                 return True
             else:
@@ -302,9 +301,9 @@ class AuthManager:
                 try:
                     context.close()
                 except Exception:
-                    pass
+                    pass  # already closed / stopped
             if playwright:
                 try:
                     playwright.stop()
                 except Exception:
-                    pass
+                    pass  # already closed / stopped
