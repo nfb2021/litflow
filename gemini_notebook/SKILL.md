@@ -179,4 +179,4 @@ More in `references/troubleshooting.md`.
   - `api_reference.md` - every command, option and Python function
   - `troubleshooting.md` - common issues and solutions
   - `usage_patterns.md` - best practices and workflow examples
-- `docs/guide.py` - interactive marimo guide for humans (`uv run --group docs marimo edit docs/guide.py`)
+- `docs/guide.py` - interactive marimo guide for humans (`uvx --with-editable . marimo edit docs/guide.py`)
