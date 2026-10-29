@@ -1,18 +1,55 @@
 [project]
-name = "gemini-notebook-skill"
-version = "2.0.0"
-description = "Claude Code skill: query Gemini Notebook (formerly NotebookLM) notebooks and add sources to them"
+name = "gemini-notebook"
+version = "3.0.0"
+description = "gnb: query Gemini Notebook (formerly NotebookLM) notebooks and add sources to them - CLI and Claude Code skill"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "patchright==1.55.2",
+    "platformdirs>=4",
+    "typer>=0.12",
 ]
 
-[tool.uv]
-package = false
+[project.scripts]
+gnb = "gemini_notebook.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [dependency-groups]
 docs = [
     "marimo>=0.25.2",
 ]
+dev = [
+    "ruff>=0.17",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "F",     # pyflakes (undefined names, unused imports, etc.)
+    "W",     # pycodestyle warnings
+    "I",     # isort (import sorting)
+    "UP",    # pyupgrade (use modern Python syntax)
+    "B",     # flake8-bugbear (catches likely bugs)
+    "RUF",   # ruff-specific rules
+]
+ignore = [
+    "E501",    # line-too-long: ruff format wraps code; long strings/URLs stay
+    "RUF001",  # ambiguous-unicode-character-string (…, ×, – in messages)
+    "RUF002",  # ambiguous-unicode-character-docstring
+    "RUF003",  # ambiguous-unicode-character-comment
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# Typer declares options as argument defaults
+extend-immutable-calls = ["typer.Argument", "typer.Option"]
+
+[tool.ruff.lint.per-file-ignores]
+"docs/*.py" = ["B018"]  # marimo cells display via bare expressions

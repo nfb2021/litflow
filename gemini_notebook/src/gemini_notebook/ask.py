@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Simple NotebookLM Question Interface
 Based on MCP server implementation - simplified without sessions
@@ -9,32 +8,24 @@ Implements hybrid auth approach:
 See: https://github.com/microsoft/playwright/issues/36139
 """
 
-import argparse
-import sys
-import time
 import re
-from pathlib import Path
+import time
 
 from patchright.sync_api import sync_playwright
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent))
-
-from auth_manager import AuthManager
-from notebook_manager import NotebookLibrary
-from config import QUERY_INPUT_SELECTORS, RESPONSE_SELECTORS
-from browser_utils import BrowserFactory, StealthUtils
-
+from .auth import AuthManager
+from .browser import BrowserFactory, StealthUtils
+from .config import QUERY_INPUT_SELECTORS, RESPONSE_SELECTORS
 
 # Follow-up reminder (adapted from MCP server for stateless operation)
 # Since we don't have persistent sessions, we encourage comprehensive questions
 # Transient "still working" placeholder text NotebookLM shows in a message
 # slot before the real answer replaces it - never treat these as the answer.
 PLACEHOLDER_RE = re.compile(
-    r'^(?:Thoughts|Investigating [^\n]*|Reading through pages\.\.\.|Scanning the text[^\n]*'
-    r'|Listed files[^\n]*'
+    r"^(?:Thoughts|Investigating [^\n]*|Reading through pages\.\.\.|Scanning the text[^\n]*"
+    r"|Listed files[^\n]*"
     # Any other single-line progress status ("Analyzing your files...", "Scanning the text…")
-    r'|[^\n]{0,80}(?:\.\.\.|…))\s*(?:expand_more)?$'
+    r"|[^\n]{0,80}(?:\.\.\.|…))\s*(?:expand_more)?$"
 )
 
 
@@ -57,13 +48,12 @@ def _bottom_most_response(page, selectors):
                 box = el.bounding_box()
                 if not box:
                     continue
-                if best_y is None or box['y'] > best_y:
+                if best_y is None or box["y"] > best_y:
                     text = el.inner_text().strip()
-                    best_text, best_y = text, box['y']
-        except:
+                    best_text, best_y = text, box["y"]
+        except Exception:
             continue
     return best_text, best_y
-
 
 
 def clean_answer(answer):
@@ -71,14 +61,14 @@ def clean_answer(answer):
     # Strip NotebookLM's collapsible "Thoughts" reasoning widget, which
     # inner_text() captures as literal text at the top of the message
     # (e.g. "Thoughts\nexpand_more\n...reasoning...\nmore_horiz\n<actual answer>")
-    answer = re.sub(r'^Thoughts\s+expand_more\s+', '', answer)
+    answer = re.sub(r"^Thoughts\s+expand_more\s+", "", answer)
 
     # Citation chips render as their own lines ("\n1\nmore_horiz\n.") - fold
     # them back inline as " [1]" and drop the chip's icon text.
-    answer = re.sub(r'\n?more_horiz(?=\n|$)', '', answer)
-    answer = re.sub(r'\n(\d+(?:\s*[-–,]\s*\d+)*)(?=\n|$)', r' [\1]', answer)
-    answer = re.sub(r'\] \[', '][', answer)
-    answer = re.sub(r'(\])\n(?=[.,;:!?)])', r'\1', answer)
+    answer = re.sub(r"\n?more_horiz(?=\n|$)", "", answer)
+    answer = re.sub(r"\n(\d+(?:\s*[-–,]\s*\d+)*)(?=\n|$)", r" [\1]", answer)
+    answer = re.sub(r"\] \[", "][", answer)
+    answer = re.sub(r"(\])\n(?=[.,;:!?)])", r"\1", answer)
     return answer
 
 
@@ -91,7 +81,9 @@ FOLLOW_UP_REMINDER = (
 )
 
 
-def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, timeout: int = 240) -> str:
+def ask_notebook(
+    question: str, notebook_url: str, headless: bool = True, timeout: int = 240
+) -> str:
     """
     Ask a question to NotebookLM
 
@@ -106,7 +98,7 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
     auth = AuthManager()
 
     if not auth.is_authenticated():
-        print("⚠️ Not authenticated. Run: uv run scripts/auth_manager.py setup")
+        print("⚠️ Not authenticated. Run: gnb auth setup")
         return None
 
     print(f"💬 Asking: {question}")
@@ -121,8 +113,7 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
 
         # Launch persistent browser context using factory
         context = BrowserFactory.launch_persistent_context(
-            playwright,
-            headless=headless
+            playwright, headless=headless
         )
 
         # Navigate to notebook
@@ -131,7 +122,9 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
         page.goto(notebook_url, wait_until="domcontentloaded")
 
         # Wait for NotebookLM (Google rebranded notebooklm.google.com -> notebook.google.com)
-        page.wait_for_url(re.compile(r"^https://notebook(?:lm)?\.google\.com/"), timeout=45000)
+        page.wait_for_url(
+            re.compile(r"^https://notebook(?:lm)?\.google\.com/"), timeout=45000
+        )
 
         # Wait for query input (MCP approach)
         print("  ⏳ Waiting for query input...")
@@ -142,12 +135,12 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
                 query_element = page.wait_for_selector(
                     selector,
                     timeout=20000,
-                    state="visible"  # Only check visibility, not disabled!
+                    state="visible",  # Only check visibility, not disabled!
                 )
                 if query_element:
                     print(f"  ✓ Found input: {selector}")
                     break
-            except:
+            except Exception:
                 continue
 
         if not query_element:
@@ -163,7 +156,7 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
 
         # Type question (human-like, fast)
         print("  ⏳ Typing question...")
-        
+
         # Use primary selector for typing
         input_selector = QUERY_INPUT_SELECTORS[0]
         StealthUtils.human_type(page, input_selector, question)
@@ -186,12 +179,12 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
         while time.time() < deadline:
             # NotebookLM still shows this element (class "thinking-message is-changing") while working
             try:
-                thinking_element = page.query_selector('div.thinking-message')
+                thinking_element = page.query_selector("div.thinking-message")
                 if thinking_element and thinking_element.is_visible():
                     stable_count = 0
                     time.sleep(1)
                     continue
-            except:
+            except Exception:
                 pass
 
             # Find the visually bottom-most (newest) response bubble
@@ -227,6 +220,7 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
     except Exception as e:
         print(f"  ❌ Error: {e}")
         import traceback
+
         traceback.print_exc()
         return None
 
@@ -235,82 +229,11 @@ def ask_notebooklm(question: str, notebook_url: str, headless: bool = True, time
         if context:
             try:
                 context.close()
-            except:
+            except Exception:
                 pass
 
         if playwright:
             try:
                 playwright.stop()
-            except:
+            except Exception:
                 pass
-
-
-def main():
-    parser = argparse.ArgumentParser(description='Ask NotebookLM a question')
-
-    parser.add_argument('--question', required=True, help='Question to ask')
-    parser.add_argument('--notebook-url', help='NotebookLM notebook URL')
-    parser.add_argument('--notebook-id', help='Notebook ID from library')
-    parser.add_argument('--show-browser', action='store_true', help='Show browser')
-    parser.add_argument('--timeout', type=int, default=240, help='Seconds to wait for the answer (default 240)')
-
-    args = parser.parse_args()
-
-    # Resolve notebook URL
-    notebook_url = args.notebook_url
-
-    if not notebook_url and args.notebook_id:
-        library = NotebookLibrary()
-        notebook = library.get_notebook(args.notebook_id)
-        if notebook:
-            notebook_url = notebook['url']
-        else:
-            print(f"❌ Notebook '{args.notebook_id}' not found")
-            return 1
-
-    if not notebook_url:
-        # Check for active notebook first
-        library = NotebookLibrary()
-        active = library.get_active_notebook()
-        if active:
-            notebook_url = active['url']
-            print(f"📚 Using active notebook: {active['name']}")
-        else:
-            # Show available notebooks
-            notebooks = library.list_notebooks()
-            if notebooks:
-                print("\n📚 Available notebooks:")
-                for nb in notebooks:
-                    mark = " [ACTIVE]" if nb.get('id') == library.active_notebook_id else ""
-                    print(f"  {nb['id']}: {nb['name']}{mark}")
-                print("\nSpecify with --notebook-id or set active:")
-                print("uv run scripts/notebook_manager.py activate --id ID")
-            else:
-                print("❌ No notebooks in library. Add one first:")
-                print("uv run scripts/notebook_manager.py add --url URL --name NAME --description DESC --topics TOPICS")
-            return 1
-
-    # Ask the question
-    answer = ask_notebooklm(
-        question=args.question,
-        notebook_url=notebook_url,
-        headless=not args.show_browser,
-        timeout=args.timeout
-    )
-
-    if answer:
-        print("\n" + "=" * 60)
-        print(f"Question: {args.question}")
-        print("=" * 60)
-        print()
-        print(answer)
-        print()
-        print("=" * 60)
-        return 0
-    else:
-        print("\n❌ Failed to get answer")
-        return 1
-
-
-if __name__ == "__main__":
-    sys.exit(main())

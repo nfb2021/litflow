@@ -1,303 +1,185 @@
 # Gemini Notebook Skill API Reference
 
-Complete API documentation for all skill scripts (Gemini Notebook was formerly NotebookLM).
-
-## Important: Run with uv from the Skill Directory
-
-```bash
-# ✅ CORRECT:
-uv run scripts/[script_name].py [arguments]
-
-# ❌ WRONG:
-python3 scripts/[script_name].py [arguments]  # system Python has no patchright
-```
-
-`uv run` creates `.venv/` from `pyproject.toml` / `uv.lock` on first use.
-
-## Core Scripts
-
-### ask_question.py
-Query NotebookLM with automated browser interaction.
+Every `gnb` command and the Python functions behind them (Gemini Notebook was formerly
+NotebookLM). `gnb` is installed as a uv tool and runs from any directory:
 
 ```bash
-# Basic usage
-uv run scripts/ask_question.py --question "Your question"
-
-# With specific notebook
-uv run scripts/ask_question.py --question "..." --notebook-id notebook-id
-
-# With direct URL
-uv run scripts/ask_question.py --question "..." --notebook-url "https://..."
-
-# Show browser (debugging)
-uv run scripts/ask_question.py --question "..." --show-browser
+uv tool install --editable ~/src/skills/gemini_notebook   # or from git, see README
+gnb --help
 ```
 
-**Parameters:**
-- `--question` (required): Question to ask
-- `--notebook-id`: Use notebook from library
-- `--notebook-url`: Use URL directly
-- `--show-browser`: Make browser visible
+## Notebook selection
 
-**Returns:** Answer text with follow-up prompt appended
+`ask` and `add` take `-n/--notebook`, which is either a **library ID** or a **notebook URL**
+(anything starting with `http`). Without it the active notebook is used
+(`gnb library activate ID`).
 
-### add_source.py
-Add sources to a notebook through the "Add sources" dialog.
+## gnb ask
 
 ```bash
-# Upload local files (repeatable)
-uv run scripts/add_source.py --notebook-id ID --file paper.pdf --file notes.md
-
-# Website / YouTube URLs (repeatable)
-uv run scripts/add_source.py --notebook-id ID --url "https://..."
-
-# Pasted text, inline or from a file
-uv run scripts/add_source.py --notebook-id ID --text "..."
-uv run scripts/add_source.py --notebook-id ID --text-file answers.md
+gnb ask "Your question"                 # active notebook
+gnb ask "..." -n notebook-id
+gnb ask "..." -n "https://notebook.google.com/notebook/..."
+gnb ask "..." --timeout 400 --show-browser
 ```
 
-**Parameters:**
-- `--notebook-id` / `--notebook-url`: Target notebook (defaults to the active notebook)
-- `--file`: Local file to upload (repeatable)
-- `--url`: Website or YouTube URL (repeatable)
-- `--text` / `--text-file`: Text added as one pasted-text source
-- `--timeout`: Seconds to wait for processing (default 300)
-- `--show-browser`: Make browser visible
+| Option | Default | Meaning |
+|---|---|---|
+| `QUESTION` (argument) | required | Question to ask |
+| `-n`, `--notebook` | active notebook | Library ID or URL |
+| `--timeout` | 240 | Seconds to wait for a stable answer |
+| `--show-browser` | off | Visible Chrome instead of headless |
 
-**Returns:** List of new sources with status `ready` / `failed` / `processing`;
-exit code 0 only if all are `ready`
+**Output:** progress lines, then the answer between two `====…` lines (60 `=`), with the
+follow-up reminder appended. Citations appear inline as `[1]`, `[1][4]`.
+**Exit code:** 0 with an answer, 1 otherwise.
 
-### notebook_manager.py
-Manage notebook library with CRUD operations.
+## gnb add
 
 ```bash
-# Smart Add (discover content first)
-uv run scripts/ask_question.py --question "What is the content of this notebook? What topics are covered? Provide a complete overview briefly and concisely" --notebook-url "[URL]"
-# Then add with discovered info
-uv run scripts/notebook_manager.py add \
-  --url "https://notebook.google.com/notebook/..." \
-  --name "Name" \
-  --description "Description" \
-  --topics "topic1,topic2"
-
-# Direct add (when you know the content)
-uv run scripts/notebook_manager.py add \
-  --url "https://notebook.google.com/notebook/..." \
-  --name "Name" \
-  --description "What it contains" \
-  --topics "topic1,topic2"
-
-# List notebooks
-uv run scripts/notebook_manager.py list
-
-# Search notebooks
-uv run scripts/notebook_manager.py search --query "keyword"
-
-# Activate notebook
-uv run scripts/notebook_manager.py activate --id notebook-id
-
-# Remove notebook
-uv run scripts/notebook_manager.py remove --id notebook-id
-
-# Show statistics
-uv run scripts/notebook_manager.py stats
+gnb add -n ID --file paper.pdf --file notes.md
+gnb add -n ID --url "https://example.org/article" --url "https://youtu.be/..."
+gnb add -n ID --text "..."
+gnb add -n ID --text-file answers.md
 ```
 
-**Commands:**
-- `add`: Add notebook (requires --url, --name, --topics)
-- `list`: Show all notebooks
-- `search`: Find notebooks by keyword
-- `activate`: Set default notebook
-- `remove`: Delete from library
-- `stats`: Display library statistics
+| Option | Default | Meaning |
+|---|---|---|
+| `-n`, `--notebook` | active notebook | Library ID or URL |
+| `-f`, `--file` | | Local file to upload (repeatable) |
+| `-u`, `--url` | | Website or YouTube URL (repeatable) |
+| `--text` | | Text added as one pasted-text source |
+| `--text-file` | | File whose contents are added as pasted text |
+| `--timeout` | 300 | Seconds to wait for processing |
+| `--show-browser` | off | Visible Chrome |
 
-### auth_manager.py
-Handle Google authentication and browser state.
+At least one of `--file`, `--url`, `--text`, `--text-file` is required (exit code 2 otherwise).
+**Output:** `New sources:` followed by `✓ title (ready)` / `✗ title (failed)` / `… title (processing)`.
+**Exit code:** 0 only if every new source is `ready`.
+
+## gnb library
 
 ```bash
-# Setup (browser visible for login)
-uv run scripts/auth_manager.py setup
-
-# Check status
-uv run scripts/auth_manager.py status
-
-# Re-authenticate
-uv run scripts/auth_manager.py reauth
-
-# Clear authentication
-uv run scripts/auth_manager.py clear
+gnb library list
+gnb library add URL --name "Name" --description "What it contains" --topics "a,b,c" \
+    [--use-cases "x,y"] [--tags "t1,t2"]
+gnb library search QUERY          # name, description, topics, tags, use cases
+gnb library activate ID
+gnb library remove ID             # library entry only, the notebook stays
+gnb library stats
 ```
 
-**Commands:**
-- `setup`: Initial authentication (browser MUST be visible)
-- `status`: Check if authenticated
-- `reauth`: Clear and re-setup
-- `clear`: Remove all auth data
+The ID is derived from the name (`"GNSS-T VOD"` → `gnss-t-vod`). The first notebook added
+becomes active. `add` fails with exit code 1 if the ID already exists.
 
-### cleanup_manager.py
-Clean skill data with preservation options.
+## gnb auth
 
 ```bash
-# Preview cleanup
-uv run scripts/cleanup_manager.py
-
-# Execute cleanup
-uv run scripts/cleanup_manager.py --confirm
-
-# Keep library
-uv run scripts/cleanup_manager.py --confirm --preserve-library
-
-# Force without prompt
-uv run scripts/cleanup_manager.py --confirm --force
+gnb auth status                   # exit code 1 if no login saved; prints the data folder
+gnb auth setup [--timeout 10]     # visible Chrome, log in manually (minutes)
+gnb auth validate                 # opens the site headless, checks the login works
+gnb auth reauth [--timeout 10]    # clear + setup, also to switch accounts
+gnb auth clear
 ```
 
-**Options:**
-- `--confirm`: Actually perform cleanup
-- `--preserve-library`: Keep notebook library
-- `--force`: Skip confirmation prompt
+## gnb cleanup
 
-## Python API Usage
+```bash
+gnb cleanup                                   # preview only
+gnb cleanup --confirm                         # asks, then deletes login + library
+gnb cleanup --confirm --preserve-library      # keep library.json
+gnb cleanup --confirm --force                 # no prompt
+```
 
-### Using subprocess
+## Data folder
+
+`~/Library/Application Support/gemini-notebook/` on macOS (platformdirs user data dir on
+other systems), or `$GEMINI_NOTEBOOK_HOME` if set.
+
+```
+library.json        notebooks and the active notebook ID
+auth_info.json      login timestamp
+browser_state/
+  browser_profile/  persistent Chrome profile
+  state.json        cookies saved at login, re-injected on every start
+```
+
+`library.json`:
+```json
+{
+  "notebooks": {
+    "notebook-id": {
+      "id": "notebook-id",
+      "url": "https://notebook.google.com/notebook/...",
+      "name": "Display Name",
+      "description": "Contents",
+      "topics": ["topic1", "topic2"],
+      "content_types": [],
+      "use_cases": [],
+      "tags": [],
+      "created_at": "ISO-8601",
+      "updated_at": "ISO-8601",
+      "use_count": 0,
+      "last_used": null
+    }
+  },
+  "active_notebook_id": "notebook-id",
+  "updated_at": "ISO-8601"
+}
+```
+
+## Python API
+
+The package is `gemini_notebook`:
+
+```python
+from gemini_notebook.ask import ask_notebook, clean_answer, PLACEHOLDER_RE
+from gemini_notebook.sources import add_sources
+from gemini_notebook.library import NotebookLibrary
+from gemini_notebook.auth import AuthManager
+
+answer = ask_notebook(
+    "Question?", "https://notebook.google.com/notebook/...", timeout=240
+)
+new = add_sources(
+    url, files=["paper.pdf"], urls=["https://..."], text="..."
+)  # [(title, status)] or None
+
+lib = NotebookLibrary()
+lib.list_notebooks()
+lib.get_notebook("id")
+lib.get_active_notebook()
+lib.add_notebook(url=..., name=..., description=..., topics=[...])
+lib.select_notebook("id")
+lib.remove_notebook("id")
+lib.search_notebooks("q")
+
+AuthManager().is_authenticated()
+```
+
+| Module | Contents |
+|---|---|
+| `cli.py` | Typer app behind `gnb` |
+| `ask.py` | `ask_notebook()`, `clean_answer()`, `PLACEHOLDER_RE`, `FOLLOW_UP_REMINDER` |
+| `sources.py` | `add_sources()` and the add-source dialog steps |
+| `library.py` | `NotebookLibrary` |
+| `auth.py` | `AuthManager` (setup, status, validate, clear, reauth) |
+| `cleanup.py` | `CleanupManager` |
+| `browser.py` | `BrowserFactory` (Chrome launch, cookie injection), `StealthUtils` |
+| `config.py` | data paths and every page selector |
+
+## Calling gnb from another program
 
 ```python
 import subprocess
-import json
 
-result = subprocess.run([
-    "uv", "run", "scripts/ask_question.py",
-    "--question", "Your question",
-    "--notebook-id", "notebook-id"
-], capture_output=True, text=True)
-
-answer = result.stdout
+result = subprocess.run(
+    ["gnb", "ask", "Question?", "-n", "notebook-id"], capture_output=True, text=True
+)
+answer = result.stdout.split("=" * 60)[2].strip() if result.returncode == 0 else None
 ```
 
-### Direct imports
+## Rate limits
 
-```python
-# Run inside the skill's environment, e.g. `uv run python` from the skill directory,
-# with scripts/ on sys.path
-from notebook_manager import NotebookLibrary
-from auth_manager import AuthManager
-
-library = NotebookLibrary()
-notebooks = library.list_notebooks()
-
-auth = AuthManager()
-is_auth = auth.is_authenticated()
-```
-
-## Data Storage
-
-Location: `data/` in the skill directory
-
-```
-data/
-├── library.json       # Notebook metadata
-├── auth_info.json     # Auth status
-└── browser_state/     # Browser cookies
-    └── state.json
-```
-
-**Security:** Protected by `.gitignore`, never commit.
-
-## Error Handling
-
-Common patterns:
-
-```python
-result = subprocess.run([
-    "uv", "run", "scripts/ask_question.py",
-    "--question", "Question"
-], capture_output=True, text=True)
-
-if result.returncode != 0:
-    error = result.stderr
-    if "rate limit" in error.lower():
-        # Wait or switch accounts
-        pass
-    elif "not authenticated" in error.lower():
-        # Run auth setup
-        subprocess.run(["uv", "run", "scripts/auth_manager.py", "setup"])
-```
-
-## Rate Limits
-
-Free Google accounts: 50 queries/day
-
-Solutions:
-1. Wait for reset (midnight PST)
-2. Switch accounts with `reauth`
-3. Use multiple Google accounts
-
-## Advanced Patterns
-
-### Parallel Queries
-
-```python
-import concurrent.futures
-import subprocess
-
-def query(question, notebook_id):
-    result = subprocess.run([
-        "uv", "run", "scripts/ask_question.py",
-        "--question", question,
-        "--notebook-id", notebook_id
-    ], capture_output=True, text=True)
-    return result.stdout
-
-# Run multiple queries simultaneously
-with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-    futures = [
-        executor.submit(query, q, nb)
-        for q, nb in zip(questions, notebooks)
-    ]
-    results = [f.result() for f in futures]
-```
-
-### Batch Processing
-
-```python
-def batch_research(questions, notebook_id):
-    results = []
-    for question in questions:
-        result = subprocess.run([
-            "uv", "run", "scripts/ask_question.py",
-            "--question", question,
-            "--notebook-id", notebook_id
-        ], capture_output=True, text=True)
-        results.append(result.stdout)
-        time.sleep(2)  # Avoid rate limits
-    return results
-```
-
-## Module Classes
-
-### NotebookLibrary
-- `add_notebook(url, name, topics)`
-- `list_notebooks()`
-- `search_notebooks(query)`
-- `get_notebook(notebook_id)`
-- `activate_notebook(notebook_id)`
-- `remove_notebook(notebook_id)`
-
-### AuthManager
-- `is_authenticated()`
-- `setup_auth(headless=False)`
-- `get_auth_info()`
-- `clear_auth()`
-- `validate_auth()`
-
-### BrowserSession (internal)
-- Handles browser automation
-- Manages stealth behavior
-- Not intended for direct use
-
-## Best Practices
-
-1. **Always use `uv run`** - Ensures environment
-2. **Check auth first** - Before operations
-3. **Handle rate limits** - Implement retries
-4. **Include context** - Questions are independent
-5. **Clean sessions** - Use cleanup_manager
+Free Google accounts allow roughly 50 questions per day. Space out automated batches,
+or switch accounts with `gnb auth reauth`.

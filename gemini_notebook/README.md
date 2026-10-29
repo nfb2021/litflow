@@ -7,7 +7,8 @@ called NotebookLM, now at `notebook.google.com`):
 - **Add sources** to a notebook: local files, websites / YouTube videos, or pasted text
 - **Keep a library** of your notebooks so Claude knows which one to use for which topic
 
-It works by driving a real Chrome browser with your Google login, because Gemini Notebook
+Everything is available as one command, `gnb`, which you can also use yourself in the
+terminal. It works by driving a real Chrome browser with your Google login, because Gemini Notebook
 has no public API.
 
 > Fork of [PleasePrompto/notebooklm-skill](https://github.com/PleasePrompto/notebooklm-skill)
@@ -31,17 +32,24 @@ git clone git@github.com:nfb2021/skills.git ~/src/skills
 mkdir -p ~/.claude/skills
 ln -s ~/src/skills/gemini_notebook ~/.claude/skills/gemini_notebook
 
-# 3. Create the environment (uv reads pyproject.toml / uv.lock)
-cd ~/.claude/skills/gemini_notebook
-uv sync
+# 3. Install the gnb command (editable: a git pull updates it too)
+uv tool install --editable ~/src/skills/gemini_notebook
 
 # 4. Log in to Google once - a Chrome window opens, log in there
-uv run scripts/auth_manager.py setup
+gnb auth setup
 ```
 
-Only if Chrome is not installed: `uv run patchright install chrome`.
+If `gnb` is not found afterwards, run `uv tool update-shell` and open a new terminal.
+Only if Chrome is not installed: `uvx patchright install chrome`.
 
-To update later: `git -C ~/src/skills pull && uv sync`.
+To update later: `git -C ~/src/skills pull` (the editable install picks it up; after a
+dependency change also `uv tool upgrade gemini-notebook`).
+
+**Only the command, without the Claude skill:**
+
+```bash
+uv tool install "git+https://github.com/nfb2021/skills#subdirectory=gemini_notebook"
+```
 
 ## Interactive guide (marimo)
 
@@ -50,7 +58,7 @@ and lets you try everything from buttons: check the login, browse your library, 
 question, add sources, and play with the answer clean-up and placeholder detection.
 
 ```bash
-cd ~/.claude/skills/gemini_notebook
+cd ~/src/skills/gemini_notebook
 uv run --group docs marimo edit docs/guide.py     # or: marimo run (app view, code hidden)
 ```
 
@@ -72,50 +80,50 @@ opens a fresh browser session, so it includes the full context every time.
 
 ## Using it from the terminal
 
-Run everything from the skill folder with `uv run`:
+`gnb` works from any folder. `-n` takes a library ID or a notebook URL; without it the
+active notebook is used.
 
 ```bash
-cd ~/.claude/skills/gemini_notebook
-
 # Ask a question
-uv run scripts/ask_question.py --question "Summarise the main findings" --notebook-id my-notebook
-uv run scripts/ask_question.py --question "..." --notebook-url "https://notebook.google.com/notebook/…"
+gnb ask "Summarise the main findings" -n my-notebook
+gnb ask "..." -n "https://notebook.google.com/notebook/…"
 
 # Add sources (types can be combined; --file and --url can be repeated)
-uv run scripts/add_source.py --notebook-id my-notebook --file paper.pdf --file notes.md
-uv run scripts/add_source.py --notebook-id my-notebook --url "https://example.org/article"
-uv run scripts/add_source.py --notebook-id my-notebook --text "Some text"
-uv run scripts/add_source.py --notebook-id my-notebook --text-file answers.md
+gnb add -n my-notebook --file paper.pdf --file notes.md
+gnb add -n my-notebook --url "https://example.org/article"
+gnb add -n my-notebook --text "Some text"
+gnb add -n my-notebook --text-file answers.md
 
 # Manage the library
-uv run scripts/notebook_manager.py list
-uv run scripts/notebook_manager.py add --url URL --name NAME --description DESC --topics "a,b"
-uv run scripts/notebook_manager.py activate --id my-notebook    # default for later commands
-uv run scripts/notebook_manager.py remove --id my-notebook
+gnb library list
+gnb library add URL --name NAME --description DESC --topics "a,b"
+gnb library activate my-notebook     # default for later commands
+gnb library remove my-notebook
 
 # Login
-uv run scripts/auth_manager.py status     # how old is the saved login?
-uv run scripts/auth_manager.py reauth     # log in again / switch account
+gnb auth status      # how old is the saved login, where is the data?
+gnb auth reauth      # log in again / switch account
 ```
 
-Useful options:
+`gnb --help` and `gnb ask --help` (etc.) list every option. Useful ones:
 
 - `--show-browser` - watch the browser instead of running it in the background
 - `--timeout SECONDS` - wait longer for long answers (default 240) or slow source processing (default 300)
 
-`add_source.py` lists every new source as `ready` or `failed` and exits with an error if
+`gnb add` lists every new source as `ready` or `failed` and exits with an error if
 any failed (for example a website Google could not import).
 
 ## Where your data lives
 
-Everything personal stays in the skill's `data/` folder, which is git-ignored:
+Your login and library are kept outside the repository, in your user data folder
+(macOS: `~/Library/Application Support/gemini-notebook/`; `gnb auth status` shows it):
 
-- `data/browser_state/` - Chrome profile and Google login cookies
-- `data/library.json` - your notebook library
-- `data/auth_info.json` - when you last logged in
+- `browser_state/` - Chrome profile and Google login cookies
+- `library.json` - your notebook library
+- `auth_info.json` - when you last logged in
 
-Nothing in `data/` is ever committed. Treat it like a password: anyone with this folder
-can use your Google session.
+Set `GEMINI_NOTEBOOK_HOME` to use another folder (e.g. for a second Google account).
+Treat the folder like a password: anyone with it can use your Google session.
 
 ## Limitations
 
@@ -124,16 +132,16 @@ can use your Google session.
 - No conversation memory between questions (each one is a new browser session).
 - Free Google accounts allow roughly 50 questions per day.
 - It depends on the Gemini Notebook web page. When Google changes the page, selectors in
-  `scripts/config.py` may need updating.
-- The Google login expires after a few weeks; run `uv run scripts/auth_manager.py reauth`.
+  `src/gemini_notebook/config.py` may need updating.
+- The Google login expires after a few weeks; run `gnb auth reauth`.
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `Not authenticated` | `uv run scripts/auth_manager.py setup` |
-| Answers or uploads suddenly fail | Log in again: `uv run scripts/auth_manager.py reauth` |
-| `ModuleNotFoundError` | Use `uv run` from the skill folder, not `python3` |
+| `gnb: command not found` | `uv tool update-shell`, new terminal; or reinstall (step 3) |
+| `Not authenticated` | `gnb auth setup` |
+| Answers or uploads suddenly fail | Log in again: `gnb auth reauth` |
 | Timeout on a long answer | Add `--timeout 400` |
 | Something looks wrong | Re-run with `--show-browser` to see what the browser sees |
 
@@ -148,8 +156,9 @@ More in [references/troubleshooting.md](references/troubleshooting.md).
 - **Background browser** uses a desktop-sized window, so the full three-panel layout loads
 - **Popups** announcing new features are closed automatically
 - **`--timeout`** option for long answers
-- **New `add_source.py`** for files, websites/YouTube and pasted text
-- **uv** replaces the old pip-based `run.py` / `setup_environment.py`
+- **Adding sources** (`gnb add`) for files, websites/YouTube and pasted text
+- **`gnb` command** (Typer, installed with `uv tool`) replaces the separate scripts and
+  the old pip-based `run.py` / `setup_environment.py`; login and library moved to the user data folder
 - **Interactive marimo guide** in `docs/guide.py`
 
 Details in [CHANGELOG.md](CHANGELOG.md).
@@ -158,7 +167,7 @@ Details in [CHANGELOG.md](CHANGELOG.md).
 
 - [docs/guide.py](docs/guide.py) - interactive marimo guide
 - [SKILL.md](SKILL.md) - instructions Claude follows when using the skill
-- [references/api_reference.md](references/api_reference.md) - every script and option
+- [references/api_reference.md](references/api_reference.md) - every command, option and Python function
 - [references/usage_patterns.md](references/usage_patterns.md) - workflows
 - [AUTHENTICATION.md](AUTHENTICATION.md) - how the login is stored and reused
 
