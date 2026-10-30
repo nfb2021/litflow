@@ -198,7 +198,7 @@ def _(mo):
 
     ## Asking Claude
 
-    With the skill installed (`ln -s ~/src/skills/zotero ~/.claude/skills/zotero`), just say
+    With the skill installed (`ln -s ~/src/litflow/zotero ~/.claude/skills/zotero`), just say
     *"add these DOIs to my Zotero collection X"*, *"which papers in X have no PDF?"*,
     or *"what do the papers in X cite most often? Import the top ones."*
     """)

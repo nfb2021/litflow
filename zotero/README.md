@@ -32,11 +32,11 @@ proxy or VPN access.
 4. **The command:**
 
    ```bash
-   uv tool install --editable ~/src/skills/zotero   # from your clone of this repo
+   uv tool install --editable ~/src/litflow/zotero   # from your clone of this repo
    zot status                                       # ✅ … Write operations enabled
    ```
 
-5. **The skill for Claude Code:** `ln -s ~/src/skills/zotero ~/.claude/skills/zotero`
+5. **The skill for Claude Code:** `ln -s ~/src/litflow/zotero ~/.claude/skills/zotero`
 
 For PDFs of paywalled papers, be on your institution's network or VPN, or set up its
 proxy in Zotero → Settings → General → *Proxies*. Otherwise Zotero finds only
@@ -71,7 +71,7 @@ A [marimo](https://marimo.io) notebook that checks your setup and lets you brows
 collection's PDFs and references:
 
 ```bash
-cd ~/src/skills/zotero
+cd ~/src/litflow/zotero
 uvx --with-editable . marimo edit docs/guide.py   # or: marimo run (app view, code hidden)
 ```
 

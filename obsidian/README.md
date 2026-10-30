@@ -12,7 +12,7 @@ graph view and backlinks.
 ## Install
 
 ```bash
-uv tool install "git+https://github.com/nfb2021/skills.git#subdirectory=obsidian"
+uv tool install "git+https://github.com/nfb2021/litflow.git#subdirectory=obsidian"
 obs --version
 ```
 
@@ -25,8 +25,8 @@ Optional, for checking quotes in PDFs:
   Tested on Einstein's 1905 photoelectric paper (Annalen der Physik 17): 17 pages
   in 16 s, prose quotes check cleanly, formulas do not survive OCR.
 
-For Claude Code, link the skill: `ln -s ~/src/skills/obsidian ~/.claude/skills/obsidian`.
-For Pi, add `~/src/skills` to `skills` in `~/.pi/agent/settings.json`.
+For Claude Code, link the skill: `ln -s ~/src/litflow/obsidian ~/.claude/skills/obsidian`.
+For Pi, add `~/src/litflow` to `skills` in `~/.pi/agent/settings.json`.
 
 ## The vault
 

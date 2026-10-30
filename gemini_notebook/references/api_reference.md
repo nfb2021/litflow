@@ -4,7 +4,7 @@ Every `gnb` command and the Python functions behind them (Gemini Notebook was fo
 NotebookLM). `gnb` is installed as a uv tool and runs from any directory:
 
 ```bash
-uv tool install --editable ~/src/skills/gemini_notebook   # or from git, see README
+uv tool install --editable ~/src/litflow/gemini_notebook   # or from git, see README
 gnb --help
 ```
 
