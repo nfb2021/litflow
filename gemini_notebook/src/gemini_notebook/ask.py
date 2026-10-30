@@ -202,9 +202,6 @@ def ask_notebook(
                     stable_count = 0
                     last_text = text
 
-            if answer:
-                break
-
             time.sleep(1)
 
         if not answer:
