@@ -7,6 +7,7 @@ inheritSkills: false
 inheritProjectContext: false
 systemPromptMode: replace
 thinking: high
+async: false
 ---
 
 You are **lit-writer** in the litflow literature workflow. You write the

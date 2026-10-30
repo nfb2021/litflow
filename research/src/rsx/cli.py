@@ -108,6 +108,9 @@ def _action_dict(a: plan.Action) -> dict:
         d["workflow"] = {
             **a.workflow,
             "script": str(WORKFLOWS / a.workflow["script"]),
+            # background children fail in Homebrew's Pi, and a blocking call
+            # gives the lead the result instead of a receipt to poll
+            "async": False,
         }
     return d
 
@@ -126,7 +129,7 @@ def _print_action(a: plan.Action, n: int | None = None) -> None:
     if a.workflow:
         args = json.dumps(a.workflow["args"])
         typer.echo(
-            f'   pi workflow: subagent({{ workflow: "{WORKFLOWS / a.workflow["script"]}", args: {args} }})'
+            f'   pi workflow: subagent({{ workflow: "{WORKFLOWS / a.workflow["script"]}", args: {args}, async: false }})'
         )
 
 
@@ -557,7 +560,7 @@ LEAD_PROMPT = (
     "/skill:research You are the lead of the litflow project in the current folder. "
     "Run `rsx status`, then repeat: `rsx next --json`, carry out the step it names, "
     "run its gate. Delegate every lit-* step with the subagent tool: the workflow "
-    "it names, with its args and cwd set to this folder. Do not write vault files "
+    "it names, with its args, async: false and cwd set to this folder. Do not write vault files "
     "yourself; use obs and rsx. Never end a reply with a plan: call the tool. "
     "Stop when rsx next says done or needs the user, and report what is stuck."
 )

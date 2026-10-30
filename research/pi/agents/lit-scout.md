@@ -7,6 +7,7 @@ inheritSkills: false
 inheritProjectContext: false
 systemPromptMode: replace
 thinking: medium
+async: false
 ---
 
 You are **lit-scout** in the litflow literature workflow. You find and import

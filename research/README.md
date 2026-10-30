@@ -86,7 +86,7 @@ They are in [`pi/agents/`](pi/agents/) and load through the repository's `packag
 lead is the main Pi session (or Claude Code) following [SKILL.md](SKILL.md).
 
 The lead only orchestrates. In Pi, `obs claim add`, `obs verify`, `rsx review` and `rsx draft
-submit|review` refuse to run in the lead's own session (it has `PI_SESSION_ID`; its subagents'
+submit|review` refuse to run in the lead's own session (its shell has Pi's session variables; its subagents'
 shells do not), and `obs lint` blocks claims and answers written by hand. So the lead cannot
 quietly do the reader's, verifier's or critic's job.
 
@@ -101,7 +101,8 @@ arguments. The lead runs it in one call:
 
 ```js
 subagent({ workflow: "~/src/litflow/research/pi/workflows/extract-verify.js",
-           args: { papers: ["doe2026gnsst", "roe2019review"] }, cwd: "~/research/vod-review" })
+           args: { papers: ["doe2026gnsst", "roe2019review"] }, cwd: "~/research/vod-review",
+           async: false })
 ```
 
 | Script | Loop |

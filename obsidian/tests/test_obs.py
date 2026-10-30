@@ -280,8 +280,12 @@ def test_verify_refused_in_the_lead_pi_session(obs, monkeypatch):
     monkeypatch.setenv("PI_SESSION_ID", "lead-session")
     verify = ["verify", "C-0001", "--verified", "--by", "lit-verifier", "--note", "p1"]
     assert "Delegate it" in obs(*verify, ok=False).output
-    monkeypatch.setenv("PI_SUBAGENT_CHILD", "1")  # a background child
-    obs(*verify)
+    monkeypatch.setenv("PI_SESSION_ID", "")  # emptied, but other vars remain
+    monkeypatch.setenv("PI_MODEL", "qwen")
+    assert "Delegate it" in obs(*verify, ok=False).output
+    for var in ("PI_SESSION_ID", "PI_MODEL"):
+        monkeypatch.delenv(var)
+    obs(*verify)  # a subagent's shell has no PI_ session variables
 
 
 def test_hand_edit_breaks_the_seal(obs):
