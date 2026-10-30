@@ -22,6 +22,22 @@ each installs its command with `uv tool install --editable ~/src/skills/<skill>`
 (`gnb` for `gemini_notebook`, `zot` for `zotero`, `obs` for `obsidian`).
 Logins and other personal data are stored outside the repository.
 
+## Skills used from upstream
+
+Documents are written in Typst with
+[lucifer1004/claude-skill-typst](https://github.com/lucifer1004/claude-skill-typst) (MIT),
+used as is and not copied here. Its repository keeps the skill in `skills/typst`, so link
+that folder, not the clone:
+
+```bash
+git clone https://github.com/lucifer1004/claude-skill-typst.git ~/src/claude-skill-typst
+ln -s ~/src/claude-skill-typst/skills/typst ~/.claude/skills/typst
+```
+
+It needs Typst 0.15 or newer (`brew install typst`). Cite with the Better BibTeX export that
+`obsidian` reads, e.g. `#bibliography("refs.bib")`; `typst compile` fails on a citation key
+that is not in the file.
+
 ## Contributing
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org) with the skill
