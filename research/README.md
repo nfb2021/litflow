@@ -158,7 +158,7 @@ refuse a reviewer whose `--by` name is the author's.
 | `rsx review Q-… --ok\|--block --note N --by R` | review an answer |
 | `rsx cite-check [DOC] [--json]` | check the draft's citations |
 | `rsx draft submit\|review\|show` | the draft's review cycle |
-| `rsx drive [--model M] [--rounds N] [--pi CMD]` | run the Pi lead again until done, a human step, or two rounds without progress |
+| `rsx drive [--model M] [--rounds N] [--pi CMD]` | run the Pi lead again until done, a human step, two rounds without progress, or a model error (e.g. a timeout) |
 | `rsx doctor`, `rsx pi install` | setup |
 
 ## Development
