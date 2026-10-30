@@ -1,0 +1,14 @@
+{
+  "name": "litflow",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Literature research workflow for AI agents: Zotero, Gemini Notebook, Obsidian vault and Typst, with agents that verify and review each other.",
+  "license": "MIT",
+  "keywords": ["pi-package"],
+  "pi": {
+    "skills": ["./gemini_notebook", "./zotero", "./obsidian", "./research"],
+    "subagents": {
+      "agents": ["./research/pi/agents"]
+    }
+  }
+}

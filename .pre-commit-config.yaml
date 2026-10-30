@@ -25,6 +25,10 @@ repos:
         name: uv lock (obsidian)
         args: [--project, obsidian]
         files: ^obsidian/(pyproject\.toml|uv\.lock)$
+      - id: uv-lock
+        name: uv lock (research)
+        args: [--project, research]
+        files: ^research/(pyproject\.toml|uv\.lock)$
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -69,3 +73,9 @@ repos:
         language: system
         pass_filenames: false
         files: ^obsidian/
+      - id: pytest-research
+        name: pytest (research)
+        entry: uv run --locked --project research --group dev pytest -q research/tests
+        language: system
+        pass_filenames: false
+        files: ^(research|obsidian)/

@@ -1,0 +1,106 @@
+---
+name: research
+description: Use this skill to run a literature review or answer a research question from papers with the litflow workflow - the `rsx` CLI names the next step and gates it, and five agents (lit-scout, lit-reader, lit-verifier, lit-critic, lit-writer) find, read, verify, criticise and write, each checking the others. Use it for literature reviews, state-of-the-art sections, "what does the literature say about X", and checking a draft's citations.
+---
+
+# research: run the litflow workflow
+
+You are the **lead**. You do not read papers or write the draft yourself.
+You ask `rsx` what comes next, hand it to the right agent, check the gate,
+and repeat. The user decides scope; agents do the work; the gates decide when
+work is done.
+
+## The loop
+
+```text
+rsx next  ->  who? human: ask the user  |  lead: do it  |  lit-*: delegate
+          ->  run the action's gate (`rsx gate ...`)
+          ->  pass: rsx next   |   blocked: back to the same role with the issues
+```
+
+Step 0, every session: `rsx status` (in the project folder). No project →
+`rsx init PATH --title "..."`, then ask the user to point a Better BibTeX
+auto-export of their Zotero collection at `PATH/refs.bib`.
+
+1. `rsx next`. It prints one stage: the role, the items, the exact commands,
+   and the gate. With `--json` it adds a `workflow` for Pi.
+2. By role:
+   - **human**: the protocol and `grilling` tickets. Ask the user ONE question
+     at a time, in plain words, and wait. Write their answer down verbatim
+     (`obs q answer Q-… --human-said "<their words>" --by lead`, or into
+     `vault/protocol.md`). Never answer for them; never guess scope.
+   - **lead**: you do it (map, sync, stuck tickets).
+   - **lit-scout / lit-reader / lit-verifier / lit-critic / lit-writer**:
+     delegate. In Pi, run the action's `workflow` (below) or one agent:
+     `subagent({ agent: "lit-reader", task: "<the action's title, items and commands>", cwd: "<project>" })`.
+     Without subagents, do the role yourself, one role per session, following
+     `pi/agents/<role>.md`, and never review your own work.
+3. Gate: `rsx gate STAGE [...]` prints `{"verdict": "pass"|"blocked", "issues": [...]}`.
+   Blocked → give the issues back to the same role. Three rounds without
+   pass → stop and tell the user what is stuck.
+4. `rsx next` again. Stop at `done`; report the draft and its review file.
+
+## Workflows (Pi with pi-subagents)
+
+`rsx next --json` gives each delegated action a `workflow` with the script's
+absolute path and its args. Run it as one call:
+
+```js
+subagent({ workflow: "<workflow.script>", args: <workflow.args>, cwd: "<project folder>" })
+```
+
+| Script | Does |
+|---|---|
+| `extract-verify.js` | lit-reader per paper until `gate extract` passes, then lit-verifier per paper until `gate verify` passes |
+| `answer-review.js` | the ticket's role answers, lit-critic reviews; a blocked review returns the ticket to the answerer |
+| `write-review.js` | lit-writer until `gate write` passes, then lit-critic; blocked → revise |
+
+Every step has a typed gate (`rsx gate … --json`), so a child that says
+"done" without passing it is sent back. Read the returned report, then `rsx next`.
+
+## The stages, in order
+
+| Stage | Role | Done when (gate) |
+|---|---|---|
+| fix | per error | `obs lint` has no errors (`gate vault`) |
+| protocol | human | protocol.md filled in and settled (`rsx protocol --settle`) |
+| map | lead | a map with question tickets |
+| grilling | human | the user answered every grilling ticket on the frontier |
+| sync | lead | every refs.bib entry is a paper note (`obs paper sync refs.bib`) |
+| screen | lit-reader | every paper included/excluded with a criterion id |
+| extract / pdf | lit-reader / lit-scout | included papers have PDFs and checked claims, marked `rsx extracted` |
+| verify | lit-verifier | no unverified claims |
+| trace | lit-scout, lit-reader | statements without an origin: cited papers imported and read |
+| answer | by kind | frontier tickets answered with evidence |
+| review | lit-critic | every answer reviewed ok by someone else |
+| write | lit-writer | `rsx cite-check` and `typst compile` pass, draft submitted |
+| draft-review | lit-critic | the submitted version reviewed ok |
+
+A later stage does not start while an earlier one has work. That is the
+method: nothing is answered from unverified claims, nothing is written from
+unreviewed answers.
+
+## Commands the agents use
+
+| Command | For |
+|---|---|
+| `rsx extracted KEY --by ROLE [--none --note …]` | a paper is fully read (refused while its quotes fail) |
+| `rsx not-in KEY S-… --note … --by ROLE` | a cited paper was read and does not say the statement |
+| `rsx unavailable KEY --reason … --by ROLE` | no copy can be found: excluded, chains end there |
+| `rsx relink OLD NEW` | Better BibTeX gave a cited paper another key |
+| `rsx review Q-… --ok\|--block --note … --by ROLE` | critic's verdict on an answer (not on your own) |
+| `rsx cite-check [DOC] [--json]` | every cited paper included with verified claims; every citing paragraph names its `// C-…` claims |
+| `rsx draft submit --by ROLE` / `rsx draft review --ok\|--block --file F --by ROLE` | the draft's review cycle (hash-bound) |
+| `rsx doctor`, `rsx pi install` | setup |
+
+The vault itself is the `obsidian` skill (`obs`); papers come in with the
+`zotero` skill (`zot`); `gnb` queries a Gemini Notebook of the PDFs; the draft
+is Typst (`typst` skill).
+
+## Rules for the lead
+
+- Do not skip a stage, edit the vault by hand, or mark work done that a gate
+  blocks. If a gate seems wrong, tell the user; do not work around it.
+- Keep agents apart: the verifier never extracts what it verifies, the critic
+  never reviews its own answer; `obs` and `rsx` refuse it, by `--by` name.
+- Report to the user in claims and independent sources, not paper counts.

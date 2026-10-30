@@ -11,7 +11,9 @@ Work through `obs` only: it keeps ids, links and frontmatter valid. Reading
 the markdown files directly is fine; editing them by hand is how vaults break.
 
 Step 0, every session: `obs status`. It names the vault, the counts, the
-frontier and the lint state. No vault found → ask the user for the path, or
+frontier and the lint state. In a litflow project (a folder with `rsx.toml`)
+`obs` finds the project's vault by itself, and `rsx next` says what to do; see
+the `research` skill. No vault found → ask the user for the path, or
 `obs init PATH`.
 
 ## The model

@@ -110,7 +110,8 @@ def render(fm: dict, body: str) -> str:
 
 
 def find_root(start: Path | None = None) -> Path:
-    """$OBS_VAULT, else the nearest folder upwards containing obs.toml."""
+    """$OBS_VAULT, else the nearest folder upwards containing obs.toml, or a
+    litflow project (rsx.toml) whose `vault` folder is one."""
     env = os.environ.get("OBS_VAULT")
     if env:
         root = Path(env).expanduser().resolve()
@@ -121,6 +122,15 @@ def find_root(start: Path | None = None) -> Path:
     for d in (here, *here.parents):
         if (d / MARKER).exists():
             return d
+        # a litflow project (rsx.toml) names its vault folder
+        project = d / "rsx.toml"
+        if project.exists():
+            m = re.search(
+                r'^\s*vault\s*=\s*"([^"]+)"', project.read_text("utf-8"), re.M
+            )
+            root = (d / (m.group(1) if m else "vault")).resolve()
+            if (root / MARKER).exists():
+                return root
     raise VaultError(
         f"no vault found from {here} upwards (no {MARKER}). "
         "Run `obs init PATH`, cd into the vault, or set $OBS_VAULT."
