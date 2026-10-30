@@ -1,6 +1,9 @@
-# skills
+# litflow
 
-Collection of Claude Code skills.
+A literature research workflow for AI agents. Each step is a skill with its own command:
+import papers into Zotero, query them in a Gemini Notebook, record verified claims and their
+citation chains in an Obsidian vault, and write in Typst. Agents verify and review each
+other's work, and the commands enforce the rules so that smaller models can follow them.
 
 | Skill | Description |
 |---|---|
@@ -11,14 +14,14 @@ Collection of Claude Code skills.
 ## Install a skill
 
 ```bash
-git clone git@github.com:nfb2021/skills.git ~/src/skills
-ln -s ~/src/skills/gemini_notebook ~/.claude/skills/gemini_notebook
-ln -s ~/src/skills/zotero ~/.claude/skills/zotero
-ln -s ~/src/skills/obsidian ~/.claude/skills/obsidian
+git clone git@github.com:nfb2021/litflow.git ~/src/litflow
+ln -s ~/src/litflow/gemini_notebook ~/.claude/skills/gemini_notebook
+ln -s ~/src/litflow/zotero ~/.claude/skills/zotero
+ln -s ~/src/litflow/obsidian ~/.claude/skills/obsidian
 ```
 
 Each skill has its own README with setup steps. Skills with Python code are uv projects;
-each installs its command with `uv tool install --editable ~/src/skills/<skill>`
+each installs its command with `uv tool install --editable ~/src/litflow/<skill>`
 (`gnb` for `gemini_notebook`, `zot` for `zotero`, `obs` for `obsidian`).
 Logins and other personal data are stored outside the repository.
 

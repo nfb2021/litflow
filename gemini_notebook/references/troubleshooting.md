@@ -6,7 +6,7 @@ All commands are `gnb`, which works from any directory.
 
 | Problem | Solution |
 |---------|----------|
-| `gnb: command not found` | `uv tool install --editable ~/src/skills/gemini_notebook` (or from git, see README); put `~/.local/bin` on PATH with `uv tool update-shell` |
+| `gnb: command not found` | `uv tool install --editable ~/src/litflow/gemini_notebook` (or from git, see README); put `~/.local/bin` on PATH with `uv tool update-shell` |
 | `⚠️ Not authenticated` | `gnb auth setup` (log in in the browser window that opens) |
 | Login saved but queries land on the sign-in page | `gnb auth reauth` |
 | Browser not found | Install Google Chrome, or `uvx patchright install chrome` |
@@ -34,7 +34,7 @@ Google sessions expire after a few weeks. When `status` reports a state older th
 ## Installation
 
 ```bash
-uv tool install --editable --force ~/src/skills/gemini_notebook   # Reinstall gnb
+uv tool install --editable --force ~/src/litflow/gemini_notebook   # Reinstall gnb
 uv tool list                       # Is gnb installed, and from where?
 uvx patchright install chrome      # Only if Google Chrome is not installed
 ```
@@ -56,7 +56,7 @@ with `--show-browser`, inspect the element, and update the selector there.
 
 ```bash
 # Keep login and library, reinstall the tool
-uv tool install --editable --force ~/src/skills/gemini_notebook
+uv tool install --editable --force ~/src/litflow/gemini_notebook
 
 # Delete browser state but keep the notebook library, then log in again
 gnb cleanup --confirm --preserve-library

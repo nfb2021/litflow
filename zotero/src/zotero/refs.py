@@ -12,7 +12,7 @@ from . import __version__
 from .client import ZoteroMCP
 
 CROSSREF = "https://api.crossref.org/works/"
-USER_AGENT = f"zot/{__version__} (https://github.com/nfb2021/skills)"
+USER_AGENT = f"zot/{__version__} (https://github.com/nfb2021/litflow)"
 
 DOI_RE = re.compile(r"\b10\.\d{4,9}/[^\s\"'<>\\]+", re.IGNORECASE)
 DASHES = str.maketrans({c: "-" for c in "‐‑‒–—−"})

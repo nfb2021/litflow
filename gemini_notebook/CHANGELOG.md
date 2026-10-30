@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] - 2026-10-29
 
-Fork: [nfb2021/skills](https://github.com/nfb2021/skills) → `gemini_notebook/`
+Fork: [nfb2021/litflow](https://github.com/nfb2021/litflow) → `gemini_notebook/`
 
 ### Added
 - `add_source.py` - add local files, website / YouTube URLs and pasted text to a notebook;

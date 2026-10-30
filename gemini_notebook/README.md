@@ -26,14 +26,14 @@ has no public API.
 
 ```bash
 # 1. Get the skills collection
-git clone git@github.com:nfb2021/skills.git ~/src/skills
+git clone git@github.com:nfb2021/litflow.git ~/src/litflow
 
 # 2. Make the skill visible to Claude Code
 mkdir -p ~/.claude/skills
-ln -s ~/src/skills/gemini_notebook ~/.claude/skills/gemini_notebook
+ln -s ~/src/litflow/gemini_notebook ~/.claude/skills/gemini_notebook
 
 # 3. Install the gnb command (editable: a git pull updates it too)
-uv tool install --editable ~/src/skills/gemini_notebook
+uv tool install --editable ~/src/litflow/gemini_notebook
 
 # 4. Log in to Google once - a Chrome window opens, log in there
 gnb auth setup
@@ -42,13 +42,13 @@ gnb auth setup
 If `gnb` is not found afterwards, run `uv tool update-shell` and open a new terminal.
 Only if Chrome is not installed: `uvx patchright install chrome`.
 
-To update later: `git -C ~/src/skills pull` (the editable install picks it up; after a
+To update later: `git -C ~/src/litflow pull` (the editable install picks it up; after a
 dependency change also `uv tool upgrade gemini-notebook`).
 
 **Only the command, without the Claude skill:**
 
 ```bash
-uv tool install "git+https://github.com/nfb2021/skills#subdirectory=gemini_notebook"
+uv tool install "git+https://github.com/nfb2021/litflow#subdirectory=gemini_notebook"
 ```
 
 ## Interactive guide (marimo)
@@ -58,7 +58,7 @@ and lets you try everything from buttons: check the login, browse your library, 
 question, add sources, and play with the answer clean-up and placeholder detection.
 
 ```bash
-cd ~/src/skills/gemini_notebook
+cd ~/src/litflow/gemini_notebook
 uvx --with-editable . marimo edit docs/guide.py   # or: marimo run (app view, code hidden)
 ```
 
