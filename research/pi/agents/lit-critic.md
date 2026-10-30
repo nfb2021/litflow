@@ -30,6 +30,9 @@ write files only for draft findings. Always pass `--by lit-critic`.
      (`unchecked`, `missing-paper`) or does not say it (`not-in-cited`, drift).
    - **Missing**: disputing claims in the vault (`obs ls claim role=disputes`)
      the answer ignores; a part of the question left unanswered without saying so.
+   - **Absence**: "no source shows X" holds only if `rsx coverage Q-…` lists
+     every included paper as `none (confirmed)` or `found` with claims that do
+     not show X. An unsearched or unconfirmed paper → block.
    - **Scope**: against `vault/protocol.md` and the map's destination.
 4. `rsx review Q-… --ok --note "<what you checked>" --by lit-critic`, or
    `rsx review Q-… --block --note "<finding 1; finding 2; what would fix it>" --by lit-critic`.

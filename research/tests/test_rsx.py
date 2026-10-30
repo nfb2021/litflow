@@ -178,6 +178,10 @@ def test_workflow_end_to_end(lf):
         "claim", "add", "-p", "doe2026gnsst", "-s", "S-0001", "-q", QUOTE,
         "-r", "origin", "--by", "lit-reader",
     )  # fmt: skip
+    lf.rsx("extracted", "doe2026gnsst", "--by", "lit-reader", ok=False)  # unsearched
+    lf.rsx(
+        "searched", "doe2026gnsst", "Q-0001", "--found", "C-0001", "--by", "lit-reader"
+    )
     lf.rsx("extracted", "doe2026gnsst", "--by", "lit-reader")
     assert gate(lf, "extract", "--paper", "doe2026gnsst")["verdict"] == "pass"
 
@@ -276,6 +280,88 @@ def test_workflow_end_to_end(lf):
     assert gate(lf, "all")["verdict"] == "pass"
 
 
+def test_each_paper_is_searched_for_each_question(lf):
+    fill_protocol(lf.root)
+    lf.rsx("protocol", "--settle")
+    lf.obs("map", "new", "VOD and water", "-d", "evidence")
+    lf.obs("q", "add", "M-0001", "Does VOD rise with canopy water?", "-k", "research")
+    lf.obs("q", "add", "M-0001", "Does VOD depend on frequency?", "-k", "research")
+    lf.obs("paper", "sync", "refs.bib")
+    for key in ("doe2026gnsst", "roe2019review"):
+        lf.obs("paper", "screen", key, "--include", "--reason", "I1: x", "--by", "lit-reader")  # fmt: skip
+    lf.rsx("unavailable", "roe2019review", "--reason", "paywalled", "--by", "lit-scout")
+    lf.obs("statement", "add", "VOD increases with canopy water content")
+    lf.obs(
+        "claim", "add", "-p", "doe2026gnsst", "-s", "S-0001", "-q", QUOTE,
+        "-r", "origin", "--by", "lit-reader",
+    )  # fmt: skip
+    a = nxt(lf)
+    assert (
+        a["stage"] == "extract"
+        and "# Q-0002: Does VOD depend on frequency?" in a["commands"]
+    )
+    lf.rsx(
+        "searched", "doe2026gnsst", "Q-0001", "--found", "C-0001", "--by", "lit-reader"
+    )
+    issues = gate(lf, "extract", "--paper", "doe2026gnsst")["issues"]
+    assert any("not searched for Q-0002" in i for i in issues)
+    lf.rsx(
+        "searched", "doe2026gnsst", "Q-0002", "--none", "--by", "lit-reader", ok=False
+    )  # no note
+    lf.rsx("searched", "doe2026gnsst", "Q-0002", "--found", "C-9999", "--by", "lit-reader", ok=False)  # fmt: skip
+    lf.rsx("searched", "doe2026gnsst", "Q-0002", "--none", "--note", "grep frequency, GHz: no hits", "--by", "lit-reader")  # fmt: skip
+    lf.rsx("extracted", "doe2026gnsst", "--by", "lit-reader")
+
+    # the 'nothing found' record waits for a second agent, like a claim
+    a = nxt(lf)
+    assert a["stage"] == "verify" and "'not in this paper'" in a["title"]
+    lf.obs("verify", "C-0001", "--verified", "--by", "lit-verifier", "--note", "p1")
+    assert gate(lf, "verify")["verdict"] == "blocked"
+    lf.rsx("confirm-none", "doe2026gnsst", "Q-0002", "--note", "x", "--by", "lit-reader", ok=False)  # fmt: skip
+    lf.rsx("confirm-none", "doe2026gnsst", "Q-0002", "--dispute", "--note", "p1 names L-band", "--by", "lit-verifier")  # fmt: skip
+    a = nxt(lf)
+    assert a["stage"] == "extract"  # back to the reader
+    assert "p1 names L-band" in lf.obs("show", "doe2026gnsst").stdout
+    lf.rsx("searched", "doe2026gnsst", "Q-0002", "--none", "--note", "read p1 again", "--by", "lit-reader")  # fmt: skip
+    lf.rsx("confirm-none", "doe2026gnsst", "Q-0002", "--note", "grep band, GHz", "--by", "lit-verifier")  # fmt: skip
+    assert gate(lf, "verify")["verdict"] == "pass"
+    assert nxt(lf)["stage"] == "answer"
+    cov = json.loads(lf.rsx("coverage", "--json").stdout)
+    assert cov == {
+        "Q-0001": {"doe2026gnsst": "found C-0001"},
+        "Q-0002": {"doe2026gnsst": "none (confirmed)"},
+    }
+
+    # a search whose claims were all rejected counts as not done
+    lf.obs(
+        "verify",
+        "C-0001",
+        "--rejected",
+        "--by",
+        "lit-verifier",
+        "--note",
+        "other topic",
+    )
+    issues = gate(lf, "extract", "--paper", "doe2026gnsst")["issues"]
+    assert any("every claim found for Q-0001 was rejected" in i for i in issues)
+
+    # search records are sealed: a hand edit is a lint error
+    note = lf.root / "vault" / "papers" / "doe2026gnsst.md"
+    note.write_text(
+        note.read_text().replace(
+            "confirmed_by: lit-verifier", "confirmed_by: lit-critic"
+        )
+    )
+    assert any(
+        i["code"] == "hand-edited"
+        for i in json.loads(lf.obs("lint", "--json", ok=None).stdout)["issues"]
+    )
+    lf.obs("reseal", "doe2026gnsst", "--by", "lead")  # drops the search records
+    assert gate(lf, "vault")["verdict"] == "pass"
+    issues = gate(lf, "extract", "--paper", "doe2026gnsst")["issues"]
+    assert any("not searched for Q-0002" in i for i in issues)
+
+
 def test_lint_errors_come_first(lf):
     fill_protocol(lf.root)
     lf.rsx("protocol", "--settle")
@@ -306,6 +392,9 @@ def test_trace_chases_unsupported_statements_until_resolved(lf):
     # doe only restates it, citing roe (no PDF) and smith (not in the vault)
     lf.obs("claim", "add", "-p", "doe2026gnsst", "-s", "S-0001", "-q", QUOTE, "-r", "restates",
            "-c", "roe2019review", "-c", "smith2020", "--by", "lit-reader")  # fmt: skip
+    lf.rsx(
+        "searched", "doe2026gnsst", "Q-0001", "--found", "C-0001", "--by", "lit-reader"
+    )
     lf.rsx("extracted", "doe2026gnsst", "--by", "lit-reader")
     lf.rsx("unavailable", "roe2019review", "--reason", "x", "--by", "lit-scout")
     lf.obs("verify", "C-0001", "--verified", "--by", "lit-verifier", "--note", "p1")
@@ -335,7 +424,12 @@ def test_not_in_ends_a_trace_read(lf):
     lf.obs("statement", "add", "VOD increases with canopy water content")
     lf.obs("claim", "add", "-p", "doe2026gnsst", "-s", "S-0001", "-q", QUOTE, "-r", "restates",
            "-c", "roe2019review", "--by", "lit-reader")  # fmt: skip
+    lf.rsx(
+        "searched", "doe2026gnsst", "Q-0001", "--found", "C-0001", "--by", "lit-reader"
+    )
     lf.rsx("extracted", "doe2026gnsst", "--by", "lit-reader")
+    lf.rsx("searched", "roe2019review", "Q-0001", "--none", "--note", "grep VOD: no hits", "--by", "lit-reader")  # fmt: skip
+    lf.rsx("confirm-none", "roe2019review", "Q-0001", "--note", "grep VOD, water", "--by", "lit-verifier")  # fmt: skip
     lf.rsx(
         "extracted", "roe2019review", "--none", "--by", "lit-reader", ok=False
     )  # needs --note

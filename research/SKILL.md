@@ -69,8 +69,8 @@ Every step has a typed gate (`rsx gate … --json`), so a child that says
 | grilling | human | the user answered every grilling ticket on the frontier |
 | sync | lead | every refs.bib entry is a paper note (`obs paper sync refs.bib`) |
 | screen | lit-reader | every paper included/excluded with a criterion id |
-| extract / pdf | lit-reader / lit-scout | included papers have PDFs and checked claims, marked `rsx extracted` |
-| verify | lit-verifier | no unverified claims |
+| extract / pdf | lit-reader / lit-scout | included papers have PDFs and checked claims, are searched for every question (`rsx searched`), marked `rsx extracted` |
+| verify | lit-verifier | no unverified claims, every "found nothing" search confirmed by a second search |
 | trace | lit-scout, lit-reader | statements without an origin: cited papers imported and read |
 | answer | by kind | frontier tickets answered with evidence |
 | review | lit-critic | every answer reviewed ok by someone else |
@@ -87,6 +87,9 @@ unreviewed answers.
 |---|---|
 | `rsx extracted KEY --by ROLE [--none --note …]` | a paper is fully read (refused while its quotes fail) |
 | `rsx not-in KEY S-… --note … --by ROLE` | a cited paper was read and does not say the statement |
+| `rsx searched KEY Q-… --found C-… \| --none --note … --by lit-reader` | a paper was searched for a question |
+| `rsx confirm-none KEY Q-… [--dispute] --note … --by lit-verifier` | a second agent checks a "found nothing" |
+| `rsx coverage [Q-…]` | per question, what each included paper holds: claims, confirmed none, unsearched |
 | `rsx unavailable KEY --reason … --by ROLE` | no copy can be found: excluded, chains end there |
 | `rsx relink OLD NEW` | Better BibTeX gave a cited paper another key |
 | `rsx review Q-… --ok\|--block --note … --by ROLE` | critic's verdict on an answer (not on your own) |

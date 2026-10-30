@@ -129,6 +129,7 @@ SEALED: dict[str, tuple[str, ...]] = {
         "reviewed_by",
         "review_of",
     ),
+    "paper": ("searched",),
 }
 SEALED_SECTIONS: dict[str, tuple[str, ...]] = {"question": ("Answer",)}
 
@@ -137,6 +138,8 @@ def seal_of(type_: str, fm: dict, body: str) -> str | None:
     """Hash of the sealed fields of a note, None for unsealed types."""
     if type_ not in SEALED:
         return None
+    if type_ == "paper" and not fm.get("searched"):
+        return None  # nothing sealed yet: papers from before search records
     data = {
         "fm": {f: fm.get(f) for f in SEALED[type_]},
         "sections": {h: get_section(body, h) for h in SEALED_SECTIONS.get(type_, ())},

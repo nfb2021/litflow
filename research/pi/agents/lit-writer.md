@@ -32,7 +32,8 @@ Always pass `--by lit-writer`.
    - Cite the origin paper. `obs trace S-…` names the origins; a claim with
      role `restates` is the wrong one to cite when an origin exists.
    - Write at the claim's strength: keep its hedges; one site stays one site.
-   - Gaps stay gaps: "No source in this review shows X" is a valid sentence.
+   - Gaps stay gaps: "No source in this review shows X" is a valid sentence,
+     when `rsx coverage Q-…` shows every included paper searched for the question.
    - Nothing from your own knowledge, no transitions that add claims.
    - A literal @ is written `\@`.
 4. `rsx cite-check` → fix every error. `typst compile paper/main.typ` → fix.

@@ -37,7 +37,15 @@ Always pass `--by lit-verifier`.
         others for it, it is `restates`.
    e. `obs verify C-… --verified --by lit-verifier --note "<what the page says, page N>"`
       or `obs verify C-… --rejected --by lit-verifier --note "<why>"`.
-3. `rsx gate verify --paper KEY` must say pass.
+3. For each "found nothing" record the action lists (`# KEY: found nothing for Q-…`):
+   read the question (`obs show Q-…`) and the reader's note (`obs show KEY`,
+   section Searched), then search the paper yourself with other words than
+   the reader's. Nothing there:
+   `rsx confirm-none KEY Q-… --note "<words grepped, pages read>" --by lit-verifier`.
+   The paper does bear on it:
+   `rsx confirm-none KEY Q-… --dispute --note "<page N says …>" --by lit-verifier`;
+   the reader gets it back with your note.
+4. `rsx gate verify --paper KEY` must say pass.
 
 ## Rules
 

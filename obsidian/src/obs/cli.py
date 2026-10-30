@@ -735,10 +735,10 @@ def reseal(
     by: str = typer.Option(..., "--by", help="Who accepts the hand edit"),
     vault: Path = VaultOpt,
 ) -> None:
-    """Accept a hand-edited claim or question, and send it back to be checked.
+    """Accept a hand-edited claim, question or paper, and send it back to be checked.
 
     A claim loses its verification and has its quote looked up again; a
-    question loses its review.
+    question loses its review; a paper loses its search records.
     """
     v = open_vault(vault)
     try:
@@ -746,20 +746,22 @@ def reseal(
     except VaultError as e:
         fail(str(e))
     if n.type not in SEALED:
-        fail(f"{n.id} is a {n.type}; only claims and questions are sealed")
+        fail(f"{n.id} is a {n.type}; only claims, questions and papers are sealed")
     if n.type == "claim":
         if n.fm.get("verification") != "unverified":
             n.fm["verification"] = "unverified"
             for f in ("verified_by", "verify_note", "verified"):
                 n.fm.pop(f, None)
         _apply_check(v, n, _check_claim(v, n))
+    elif n.type == "paper":
+        n.fm.pop("searched", None)
     else:
         for f in ("review", "reviewed_by", "reviewed", "review_of"):
             n.fm.pop(f, None)
     n.fm["resealed_by"] = by
     n.fm["resealed"] = today()
     v.save(n)
-    again = "verified" if n.type == "claim" else "reviewed"
+    again = {"claim": "verified", "paper": "searched"}.get(n.type, "reviewed")
     typer.echo(f"{n.id}: resealed; it must be {again} again")
 
 

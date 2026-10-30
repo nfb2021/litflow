@@ -338,6 +338,147 @@ def not_in(
     typer.echo(f"{paper.id}: does not state {st.id}")
 
 
+def _search_target(v, key: str, question: str):
+    try:
+        paper = v.get(key, "paper")
+        q = v.get(question, "question")
+    except VaultError as e:
+        fail(str(e))
+    if q.id not in {x.id for x in plan.search_questions(v)}:
+        fail(f"{q.id} is not a question papers are searched for")
+    return paper, q
+
+
+def _log_search(paper, line: str) -> None:
+    log = get_section(paper.body, "Searched")
+    paper.body = set_section(paper.body, "Searched", (log + f"\n- {line}").strip())
+
+
+@app.command()
+def searched(
+    key: str = typer.Argument(..., help="Paper citekey"),
+    question: str = typer.Argument(..., help="The question it was searched for"),
+    found: list[str] = typer.Option(
+        None, "--found", help="Claims of this paper that bear on the question"
+    ),
+    none: bool = typer.Option(
+        False, "--none", help="The paper says nothing on the question"
+    ),
+    note: str = typer.Option("", "--note", help="Words and pages searched"),
+    by: str = ByOpt,
+    project: Path = ProjectOpt,
+) -> None:
+    """Record that a paper was searched for a question: the claims found, or none."""
+    if msg := refuse_lead("lit-reader", "Searching a paper"):
+        fail(msg)
+    p = open_project(project)
+    v = p.vault
+    paper, q = _search_target(v, key, question)
+    if paper.fm.get("screening") != "included":
+        fail(f"{paper.id} is {paper.fm.get('screening', 'pending')}, not included")
+    found = [c for f in found or [] for c in f.replace(",", " ").split()]
+    if bool(found) == none:
+        fail("give either --found C-… or --none")
+    if none and not note.strip():
+        fail("--none needs --note: the words and pages you searched")
+    own = {c.id: c for c in plan.claims_of(v, paper.id)}
+    for cid in found:
+        if cid not in own:
+            fail(f"{cid} is not a claim of {paper.id}")
+        if own[cid].fm.get("verification") == "rejected":
+            fail(f"{cid} was rejected; it cannot answer {q.id}")
+    if none and own:
+        hint = ", ".join(own)
+        info(f"{paper.id} has claims ({hint}); none of them bears on {q.id}?")
+    entry = {"by": by, "date": today()}
+    entry.update({"none": note.strip()} if none else {"found": found})
+    paper.fm["searched"] = {**(paper.fm.get("searched") or {}), q.id: entry}
+    what = f"nothing: {note.strip()}" if none else "found " + ", ".join(found)
+    _log_search(paper, f"{link(q.id)} ({today()}, {by}): {what}")
+    v.save(paper)
+    typer.echo(f"{paper.id}: searched for {q.id}, {what}")
+
+
+@app.command("confirm-none")
+def confirm_none(
+    key: str = typer.Argument(..., help="Paper citekey"),
+    question: str = typer.Argument(..., help="The question it was found silent on"),
+    dispute: bool = typer.Option(
+        False, "--dispute", help="The paper does bear on the question"
+    ),
+    note: str = typer.Option(..., "--note", help="What you searched, or what it says"),
+    by: str = ByOpt,
+    project: Path = ProjectOpt,
+) -> None:
+    """Check a reader's 'nothing in this paper' record by searching the paper again."""
+    if msg := refuse_lead("lit-verifier", "Checking a search"):
+        fail(msg)
+    p = open_project(project)
+    v = p.vault
+    paper, q = _search_target(v, key, question)
+    searched = dict(paper.fm.get("searched") or {})
+    entry = searched.get(q.id)
+    if not entry or "none" not in entry:
+        fail(f"{paper.id} has no 'nothing found' record for {q.id}")
+    if entry.get("by") == by:
+        fail(f"{by} recorded this search; a different agent checks it")
+    if dispute:
+        del searched[q.id]
+        verb = "disputed"
+    else:
+        searched[q.id] = {**entry, "confirmed_by": by, "confirmed": today()}
+        verb = "confirmed"
+    paper.fm["searched"] = searched
+    _log_search(paper, f"{link(q.id)} ({today()}, {by}): {verb}: {note.strip()}")
+    v.save(paper)
+    typer.echo(f"{paper.id}: nothing on {q.id} {verb}")
+
+
+@app.command()
+def coverage(
+    question: str = typer.Argument(None, help="One question; default: all of them"),
+    as_json: bool = typer.Option(False, "--json"),
+    project: Path = ProjectOpt,
+) -> None:
+    """What each included paper holds for a question: found claims, confirmed none, or unsearched."""
+    p = open_project(project)
+    v = p.vault
+    qs = plan.search_questions(v)
+    if question:
+        qs = [q for q in qs if q.id == question]
+        if not qs:
+            fail(f"{question} is not a question papers are searched for")
+    papers = [x for x in v.of_type("paper") if x.fm.get("screening") == "included"]
+    out = {}
+    for q in qs:
+        rows = {}
+        for paper in papers:
+            s = (paper.fm.get("searched") or {}).get(q.id)
+            if s is None:
+                rows[paper.id] = "unsearched"
+            elif "none" in s:
+                rows[paper.id] = (
+                    "none (confirmed)"
+                    if s.get("confirmed_by")
+                    else "none (unconfirmed)"
+                )
+            else:
+                ok = [
+                    c
+                    for c in s["found"]
+                    if c in v.notes and v.notes[c].fm.get("verification") == "verified"
+                ]
+                rows[paper.id] = "found " + (", ".join(ok) or "(none verified)")
+        out[q.id] = rows
+    if as_json:
+        typer.echo(json.dumps(out, indent=2))
+        return
+    for q in qs:
+        typer.echo(f"{q.id}: {q.title}")
+        for key, row in out[q.id].items():
+            typer.echo(f"  {key}: {row}")
+
+
 @app.command()
 def unavailable(
     key: str = typer.Argument(..., help="Citekey of the paper that cannot be obtained"),

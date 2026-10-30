@@ -51,6 +51,8 @@ FIXER = {
     "hand-edited": "lead",
 }
 CRITERION = re.compile(r"^\s*[IE]\d+\b")
+# questions every included paper is searched for before its extraction counts
+SEARCHED_KINDS = ("research", "query", "falsify")
 
 
 @dataclass
@@ -139,6 +141,48 @@ def has_pdf(vault: Vault, paper) -> bool:
 
 def claims_of(vault: Vault, key: str) -> list:
     return [c for c in vault.of_type("claim") if key in c.links("paper")]
+
+
+def search_questions(vault: Vault) -> list:
+    """The questions every included paper must be searched for."""
+    return [
+        q
+        for q in vault.of_type("question")
+        if q.fm.get("kind") in SEARCHED_KINDS and q.fm.get("status") != "out-of-scope"
+    ]
+
+
+def search_problems(vault: Vault, paper) -> list[str]:
+    """Questions the paper was not (or no longer) searched for."""
+    searched = paper.fm.get("searched") or {}
+    out = []
+    for q in search_questions(vault):
+        s = searched.get(q.id)
+        if s is None:
+            out.append(
+                f"{paper.id}: not searched for {q.id} ({q.title}); "
+                f"`rsx searched {paper.id} {q.id} --found C-… | --none --note …`"
+            )
+        elif s.get("found") and all(
+            vault.notes.get(c) is None
+            or vault.notes[c].fm.get("verification") == "rejected"
+            for c in s["found"]
+        ):
+            out.append(
+                f"{paper.id}: every claim found for {q.id} was rejected; search again "
+                f"(`obs show {paper.id}`, section Searched) and record it with `rsx searched`"
+            )
+    return out
+
+
+def unconfirmed_nones(vault: Vault, paper) -> list[str]:
+    """Questions the paper was found silent on that no second agent checked."""
+    open_ids = {q.id for q in search_questions(vault)}
+    return [
+        qid
+        for qid, s in (paper.fm.get("searched") or {}).items()
+        if qid in open_ids and "none" in s and not s.get("confirmed_by")
+    ]
 
 
 def unsupported_statements(vault: Vault) -> list[str]:
@@ -337,6 +381,7 @@ def extraction_problems(x: Ctx, key: str) -> list[str]:
         out.append(f"{key}: not marked done; run `rsx extracted {key} --by lit-reader`")
     elif ext == "done" and not claims:
         out.append(f"{key}: marked done but has no claims")
+    out += search_problems(x.vault, p)
     for c in claims:
         if c.fm.get("verification") == "rejected":
             continue  # the record of what the paper does not say
@@ -366,12 +411,15 @@ def s_extract(x: Ctx) -> list[Action]:
             "extract",
             "lit-reader",
             f"Extract the claims of {len(todo)} paper(s)",
-            "Findings only count as claims with a verbatim quote from the PDF. One reader per paper.",
+            "Findings only count as claims with a verbatim quote from the PDF. "
+            "Each paper is searched for every question below. One reader per paper.",
             items=todo,
-            commands=[
-                "obs map show M-0001                # what to look for",
+            commands=[f"# {q.id}: {q.title}" for q in search_questions(x.vault)]
+            + [
                 "obs pdf-text KEY --grep WORD",
                 'obs claim add -p KEY -s S-… -q "<exact sentence>" -r ROLE --by lit-reader',
+                "rsx searched KEY Q-… --found C-… --by lit-reader     # per question",
+                'rsx searched KEY Q-… --none --note "<words and pages searched>" --by lit-reader',
                 "rsx extracted KEY --by lit-reader  # when the paper is done",
             ],
             gate="rsx gate extract --paper KEY",
@@ -385,25 +433,37 @@ def s_verify(x: Ctx) -> list[Action]:
     for c in x.vault.of_type("claim"):
         if c.fm.get("verification", "unverified") == "unverified":
             todo.setdefault((c.links("paper") or ["?"])[0], []).append(c.id)
-    if not todo:
+    nones = {k: unconfirmed_nones(x.vault, p) for k, p in x.papers.items()}
+    nones = {k: qs for k, qs in nones.items() if qs}
+    if not todo and not nones:
         return []
+    papers = sorted({*todo, *nones})
+    title = f"Verify {sum(map(len, todo.values()))} claim(s)"
+    if nones:
+        title += f" and {sum(map(len, nones.values()))} 'not in this paper' record(s)"
     return [
         Action(
             "verify",
             "lit-verifier",
-            f"Verify {sum(map(len, todo.values()))} claim(s) of {len(todo)} paper(s)",
-            "A different agent than the extractor checks every claim against its page.",
-            items=sorted(todo),
+            f"{title} of {len(papers)} paper(s)",
+            "A different agent than the extractor checks every claim against its page, "
+            "and searches the paper again where the reader found nothing.",
+            items=papers,
             commands=[
                 "obs ls claim paper=KEY verification=unverified",
                 "obs show C-…",
                 "obs pdf-text KEY --page N",
                 'obs verify C-… --verified|--rejected --by lit-verifier --note "<what the page says>"',
+            ]
+            + [f"# {k}: found nothing for {', '.join(qs)}" for k, qs in nones.items()]
+            + [
+                'rsx confirm-none KEY Q-… --note "<words and pages you searched>" --by lit-verifier',
+                'rsx confirm-none KEY Q-… --dispute --note "<page N says …>" --by lit-verifier',
             ],
             gate="rsx gate verify --paper KEY",
             workflow={
                 "script": "extract-verify.js",
-                "args": {"papers": sorted(todo), "skipExtract": True},
+                "args": {"papers": papers, "skipExtract": True},
             },
         )
     ]

@@ -33,9 +33,17 @@ Always pass `--by lit-reader`.
       list them with -c), `restates-uncited`, `disputes`.
    d. "quote not found" → nothing was saved. Copy again from `pdf-text`. A
       sentence broken by a line or page break: quote the part on one page.
-4. `rsx extracted KEY --by lit-reader` when done. Nothing relevant in it:
+4. Search the paper for **every** question the action lists (`# Q-…: …`),
+   not only the ones your first findings touch. Grep its key terms, glossary
+   aliases and their German and English forms, read the pages around hits,
+   and check the abstract, results and conclusions. Then per question:
+   `rsx searched KEY Q-… --found C-… [--found C-…] --by lit-reader`, or
+   `rsx searched KEY Q-… --none --note "<words grepped, pages read>" --by lit-reader`.
+   A "none" is checked by lit-verifier, who searches the paper again; a
+   search whose claims are all rejected must be done again.
+5. `rsx extracted KEY --by lit-reader` when done. Nothing relevant in it:
    `rsx extracted KEY --none --note "<why>" --by lit-reader`.
-5. `rsx gate extract --paper KEY` must say pass. Fix what it lists (3 rounds max).
+6. `rsx gate extract --paper KEY` must say pass. Fix what it lists (3 rounds max).
 
 ## Screening (action "screen")
 

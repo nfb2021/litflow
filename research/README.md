@@ -55,13 +55,21 @@ from unreviewed answers.
 | grilling | you | you answered the scope questions the agents may not decide |
 | sync | lead | every entry of `refs.bib` is a paper in the vault |
 | screen | lit-reader | every paper is included or excluded, with a criterion id from the protocol |
-| extract, pdf | lit-reader, lit-scout | every included paper has a PDF and quote-checked claims, marked with `rsx extracted` |
-| verify | lit-verifier | no claim is unverified |
+| extract, pdf | lit-reader, lit-scout | every included paper has a PDF and quote-checked claims, was searched for every question of the map, and is marked with `rsx extracted` |
+| verify | lit-verifier | no claim is unverified, and a second search confirmed each "found nothing" |
 | trace | lit-scout, lit-reader | statements without an origin have their cited papers imported and read |
 | answer | by ticket kind | the frontier tickets are answered, with the claims they rest on |
 | review | lit-critic | each answer was reviewed ok by an agent that did not write it |
 | write | lit-writer | `rsx cite-check` and `typst compile` pass and the draft was submitted |
 | draft review | lit-critic | the submitted version was reviewed ok |
+
+Verification guards precision: nothing false gets in. Searching guards recall. A reader
+records, for every question on the map, what each paper holds for it (`rsx searched KEY Q-…
+--found C-…`) or that it holds nothing (`--none --note "<words grepped, pages read>"`). A
+"nothing" counts only after the verifier searched the paper again and confirmed it; a dispute
+sends the paper back to the reader. A question added later reopens every paper. So "no source
+in this review shows X" is a checked statement: `rsx coverage Q-…` lists, per included paper,
+the claims found, a confirmed none, or "unsearched".
 
 Each step names its check, e.g. `rsx gate extract --paper doe2026gnsst`. A gate prints one
 JSON verdict, `pass` or `blocked` with the issues, and exits 0 either way, so a workflow can
@@ -153,6 +161,9 @@ refuse a reviewer whose `--by` name is the author's.
 | `rsx protocol [--settle]` | what the protocol still lacks; settle it |
 | `rsx extracted KEY --by R [--none --note N]` | a paper is fully read |
 | `rsx not-in KEY S-… --note N --by R` | a cited paper does not state the statement |
+| `rsx searched KEY Q-… --found C-… \| --none --note N --by R` | a paper was searched for a question |
+| `rsx confirm-none KEY Q-… [--dispute] --note N --by R` | a second agent checks a "found nothing" |
+| `rsx coverage [Q-…] [--json]` | what each included paper holds for each question |
 | `rsx unavailable KEY --reason N --by R` | no copy can be found: excluded, chains end there |
 | `rsx relink OLD NEW` | point claim citations at a paper's real key |
 | `rsx review Q-… --ok\|--block --note N --by R` | review an answer |
