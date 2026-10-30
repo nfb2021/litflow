@@ -1,4 +1,5 @@
 import json
+import shlex
 import shutil
 from pathlib import Path
 
@@ -503,6 +504,14 @@ def test_drive_stops_for_the_user_and_on_a_stall(lf, monkeypatch):
     assert len(list((lf.root / ".rsx" / "drive").glob("round-*.jsonl"))) == 2
     r = lf.rsx("drive", "--pi", "exit 9 #", ok=False)
     assert "pi exited 9" in r.output
+    end = {
+        "type": "agent_end",
+        "messages": [{"stopReason": "error", "errorMessage": "Request timed out."}],
+    }
+    r = lf.rsx(
+        "drive", "--pi", f"echo noise; echo {shlex.quote(json.dumps(end))} #", ok=False
+    )
+    assert "did not answer in round 1: Request timed out." in r.output
 
 
 def test_review_refused_in_the_lead_pi_session(lf, monkeypatch):

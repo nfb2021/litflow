@@ -577,6 +577,22 @@ def _progress(p: proj.Project) -> str:
     return json.dumps([actions, files])
 
 
+def _model_error(log: Path) -> str | None:
+    """The error that ended a Pi run without a model reply, e.g. a timeout."""
+    error = None
+    for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue  # shell start-up noise
+        if isinstance(event, dict) and event.get("type") == "agent_end":
+            last = (event.get("messages") or [{}])[-1]
+            error = (
+                last.get("errorMessage") if last.get("stopReason") == "error" else None
+            )
+    return error
+
+
 @app.command()
 def drive(
     model: str = typer.Option(
@@ -618,6 +634,8 @@ def drive(
             )
         if r.returncode:
             fail(f"pi exited {r.returncode} in round {n}; see {p.rel(log)}")
+        if error := _model_error(log):
+            fail(f"the model did not answer in round {n}: {error}; see {p.rel(log)}")
         stalled = 0 if _progress(p) != before else stalled + 1
         if stalled == 2:
             fail(f"no progress in two rounds; still at: {plan.plan(p)[0].title}")
