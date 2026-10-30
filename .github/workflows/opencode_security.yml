@@ -1,0 +1,46 @@
+name: OpenCode Security Review
+
+on:
+  schedule:
+    - cron: '0 7 * * 1' # Weekly on Monday at 07:00 UTC, after the other scans
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  review:
+    name: review
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: read
+      issues: read
+      actions: read
+      checks: read
+      security-events: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: anomalyco/opencode/github@810c0eba1a7348036f8bdf61e6632d0c36c6876c # v1.19.5
+        env:
+          AQUEDUCT_API_KEY: ${{ secrets.AQUEDUCT_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          OPENCODE_CONFIG_CONTENT: |
+            {
+              "provider": {
+                "aqueduct": {
+                  "npm": "@ai-sdk/openai-compatible",
+                  "name": "TU Wien Aqueduct",
+                  "options": {
+                    "baseURL": "https://aqueduct.ai.datalab.tuwien.ac.at/v1",
+                    "apiKey": "{env:AQUEDUCT_API_KEY}"
+                  },
+                  "models": { "main": { "name": "main" } }
+                }
+              }
+            }
+        with:
+          model: aqueduct/main
+          prompt: Do the weekly security review described in AGENTS.md.
