@@ -82,7 +82,11 @@ FOLLOW_UP_REMINDER = (
 
 
 def ask_notebook(
-    question: str, notebook_url: str, headless: bool = True, timeout: int = 240
+    question: str,
+    notebook_url: str,
+    headless: bool = True,
+    timeout: int = 240,
+    reminder: bool = True,
 ) -> str:
     """
     Ask a question to NotebookLM
@@ -91,6 +95,7 @@ def ask_notebook(
         question: Question to ask
         notebook_url: NotebookLM notebook URL
         headless: Run browser in headless mode
+        reminder: Append the follow-up reminder for agents reading the answer
 
     Returns:
         Answer text from NotebookLM
@@ -212,7 +217,7 @@ def ask_notebook(
 
         print("  ✅ Got answer!")
         # Add follow-up reminder to encourage Claude to ask more questions
-        return answer + FOLLOW_UP_REMINDER
+        return answer + FOLLOW_UP_REMINDER if reminder else answer
 
     except Exception as e:
         print(f"  ❌ Error: {e}")

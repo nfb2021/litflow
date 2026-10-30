@@ -15,6 +15,7 @@ const report = { extract: {}, verify: {} };
 function readerTask(key, issues) {
   const lines = [
     `Extract the claims of paper ${key} for the map's questions.`,
+    `Start with \`rsx leads ${key}\` (what the Gemini Notebook quoted from it, if the project has one).`,
     "Follow your procedure for a paper: search it for every question of the map and record",
     "each with `rsx searched`. Finish with `rsx extracted " + key + " --by lit-reader`.",
     `Done when \`rsx gate extract --paper ${key}\` says pass.`,
@@ -30,7 +31,7 @@ function verifierTask(key, issues) {
   const lines = [
     `Verify every unverified claim of paper ${key} against its page.`,
     `List them with \`obs ls claim paper=${key} verification=unverified\`.`,
-    "Then search the paper again for each question the reader found nothing on, and",
+    "Then search the paper again for each question the reader or the notebook found nothing on, and",
     "confirm or dispute it with `rsx confirm-none` (`rsx next --role lit-verifier` lists them).",
     `Done when \`rsx gate verify --paper ${key}\` says pass.`,
   ];

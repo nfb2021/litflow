@@ -23,6 +23,7 @@ GATES = (
     "sync",
     "screen",
     "pdf",
+    "notebook",
     "extract",
     "verify",
     "trace",
@@ -96,6 +97,8 @@ def gate(
         issues += _from_actions(plan.s_screen(x), paper)
     elif stage == "pdf":
         issues += _from_actions(plan.s_pdf(x), paper)
+    elif stage == "notebook":
+        issues += _from_actions(plan.s_notebook(x), paper)
     elif stage == "extract":
         keys = [paper] if paper else [a for s in plan.s_extract(x) for a in s.items]
         for k in keys:

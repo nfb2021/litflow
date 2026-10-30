@@ -38,9 +38,11 @@ Always pass `--by lit-verifier`.
    e. `obs verify C-… --verified --by lit-verifier --note "<what the page says, page N>"`
       or `obs verify C-… --rejected --by lit-verifier --note "<why>"`.
 3. For each "found nothing" record the action lists (`# KEY: found nothing for Q-…`):
-   read the question (`obs show Q-…`) and the reader's note (`obs show KEY`,
-   section Searched), then search the paper yourself with other words than
-   the reader's. Nothing there:
+   read the question (`obs show Q-…`) and the note (`obs show KEY`, section
+   Searched). The record is the reader's, or the notebook's ("the notebook
+   quoted nothing from it"). Search the PDF yourself with other words than
+   the reader's. For a notebook record, also read `rsx leads KEY -q Q-…`:
+   quotes "in no PDF" may be translated or paraphrased passages of this paper. Nothing there:
    `rsx confirm-none KEY Q-… --note "<words grepped, pages read>" --by lit-verifier`.
    The paper does bear on it:
    `rsx confirm-none KEY Q-… --dispute --note "<page N says …>" --by lit-verifier`;

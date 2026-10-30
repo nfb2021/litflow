@@ -55,6 +55,7 @@ from unreviewed answers.
 | grilling | you | you answered the scope questions the agents may not decide |
 | sync | lead | every entry of `refs.bib` is a paper in the vault |
 | screen | lit-reader | every paper is included or excluded, with a criterion id from the protocol |
+| notebook | you, then lead | you chose a Gemini Notebook (or none); it holds every included PDF, and every question was asked since (`rsx ask`) |
 | extract, pdf | lit-reader, lit-scout | every included paper has a PDF and quote-checked claims, was searched for every question of the map, and is marked with `rsx extracted` |
 | verify | lit-verifier | no claim is unverified, and a second search confirmed each "found nothing" |
 | trace | lit-scout, lit-reader | statements without an origin have their cited papers imported and read |
@@ -62,6 +63,19 @@ from unreviewed answers.
 | review | lit-critic | each answer was reviewed ok by an agent that did not write it |
 | write | lit-writer | `rsx cite-check` and `typst compile` pass and the draft was submitted |
 | draft review | lit-critic | the submitted version was reviewed ok |
+
+With a Gemini Notebook, the search starts there: the notebook finds, the PDF judges. The
+notebook holds every included PDF (`rsx notebook push`) and searches 50 papers at once, so
+`rsx ask Q-…` asks it each question once and makes it quote word for word. Every quote is
+then looked up in the local PDF text of every included paper. Found, it is a lead: paper,
+page, and the page's own sentence, ready to quote (`rsx leads KEY`). Close but not found, it
+is a weak lead (paraphrased: read the page). Found nowhere, it is listed as a quote "in no
+PDF" (translated or invented). A paper the notebook quotes nothing from is recorded as
+"nothing found" by `notebook`, and a verifier confirms that by searching the PDF itself, so
+an absence rests on two different methods. The notebook's answer is never evidence. The
+answers and leads are kept in `.rsx/notebook/Q-….json`. A project decides once:
+`rsx notebook use URL` (create an empty notebook at notebook.google.com first) or
+`rsx notebook use none` to read the PDFs locally only.
 
 Verification guards precision: nothing false gets in. Searching guards recall. A reader
 records, for every question on the map, what each paper holds for it (`rsx searched KEY Q-…
@@ -157,13 +171,17 @@ refuse a reviewer whose `--by` name is the author's.
 | `rsx init PATH --title T` | new project |
 | `rsx next [--role R] [--json]` | the next step |
 | `rsx status [--json]` | counts, current step, draft state |
-| `rsx gate STAGE [--paper K] [--question Q]` | one JSON verdict; stages: vault, protocol, map, grilling, sync, screen, pdf, extract, verify, trace, answer, review, write, draft, all |
+| `rsx gate STAGE [--paper K] [--question Q]` | one JSON verdict; stages: vault, protocol, map, grilling, sync, screen, notebook, pdf, extract, verify, trace, answer, review, write, draft, all |
 | `rsx protocol [--settle]` | what the protocol still lacks; settle it |
 | `rsx extracted KEY --by R [--none --note N]` | a paper is fully read |
 | `rsx not-in KEY S-… --note N --by R` | a cited paper does not state the statement |
 | `rsx searched KEY Q-… --found C-… \| --none --note N --by R` | a paper was searched for a question |
 | `rsx confirm-none KEY Q-… [--dispute] --note N --by R` | a second agent checks a "found nothing" |
 | `rsx coverage [Q-…] [--json]` | what each included paper holds for each question |
+| `rsx notebook use URL\|none` | the project's Gemini Notebook (the user's decision) |
+| `rsx notebook push [--mark-only]` | add the included PDFs to it (`--mark-only`: they are there already, e.g. from `zot push`) |
+| `rsx ask [Q-…] [--json]` | ask the notebook each question once; quotes looked up in the PDFs become leads |
+| `rsx leads KEY [-q Q-…] [--json]` | what the notebook quoted from a paper, as the page prints it |
 | `rsx unavailable KEY --reason N --by R` | no copy can be found: excluded, chains end there |
 | `rsx relink OLD NEW` | point claim citations at a paper's real key |
 | `rsx review Q-… --ok\|--block --note N --by R` | review an answer |

@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass, field
 from obs import bib, lint, provenance, wayfinder
 from obs.vault import Vault, get_section
 
-from rsx import review
+from rsx import notebook, review
 from rsx.project import Project
 
 ROLES = (
@@ -367,6 +367,58 @@ def s_pdf(x: Ctx) -> list[Action]:
     ]
 
 
+def s_notebook(x: Ctx) -> list[Action]:
+    nb = x.project.notebook
+    ready = {k: p for k, p in _included(x).items() if has_pdf(x.vault, p)}
+    if not ready or nb == "none":
+        return []
+    if not nb:
+        return [
+            Action(
+                "notebook",
+                "human",
+                "Give this project a Gemini Notebook (or decide to work without one)",
+                "The notebook searches all PDFs at once for each question; its quotes "
+                "are then looked up in the local PDFs. Only the user can create it.",
+                commands=[
+                    "# create an empty notebook at https://notebook.google.com, copy its URL",
+                    "rsx notebook use URL",
+                    "rsx notebook use none   # read the PDFs locally only",
+                ],
+                gate="rsx gate notebook",
+            )
+        ]
+    push = [k for k, p in ready.items() if not p.fm.get("in_notebook")]
+    if push:
+        return [
+            Action(
+                "notebook",
+                "lead",
+                f"Add the PDFs of {len(push)} included paper(s) to the Gemini Notebook",
+                "The notebook can only find what it holds.",
+                items=push,
+                commands=["rsx notebook push"],
+                gate="rsx gate notebook",
+            )
+        ]
+    papers = notebook.in_notebook(x.vault)
+    ask = [q.id for q in search_questions(x.vault) if notebook.needs_asking(q, papers)]
+    if not ask:
+        return []
+    return [
+        Action(
+            "notebook",
+            "lead",
+            f"Ask the Gemini Notebook {len(ask)} question(s)",
+            "One query per question searches every paper; its quotes become leads "
+            "for the readers, and papers it quotes nothing from go to the verifiers.",
+            items=ask,
+            commands=["rsx ask Q-…"],
+            gate="rsx gate notebook",
+        )
+    ]
+
+
 def extraction_problems(x: Ctx, key: str) -> list[str]:
     """Why paper KEY's extraction does not count as done (empty = done)."""
     p = x.papers.get(key)
@@ -416,6 +468,7 @@ def s_extract(x: Ctx) -> list[Action]:
             items=todo,
             commands=[f"# {q.id}: {q.title}" for q in search_questions(x.vault)]
             + [
+                "rsx leads KEY   # what the notebook quoted from this paper, per question",
                 "obs pdf-text KEY --grep WORD",
                 'obs claim add -p KEY -s S-… -q "<exact sentence>" -r ROLE --by lit-reader',
                 "rsx searched KEY Q-… --found C-… --by lit-reader     # per question",
@@ -447,13 +500,14 @@ def s_verify(x: Ctx) -> list[Action]:
             "lit-verifier",
             f"{title} of {len(papers)} paper(s)",
             "A different agent than the extractor checks every claim against its page, "
-            "and searches the paper again where the reader found nothing.",
+            "and searches the paper again where the reader or the notebook found nothing.",
             items=papers,
             commands=[
                 "obs ls claim paper=KEY verification=unverified",
                 "obs show C-…",
                 "obs pdf-text KEY --page N",
                 'obs verify C-… --verified|--rejected --by lit-verifier --note "<what the page says>"',
+                "rsx leads KEY   # the notebook's quotes, and the ones found in no PDF",
             ]
             + [f"# {k}: found nothing for {', '.join(qs)}" for k, qs in nones.items()]
             + [
@@ -708,6 +762,7 @@ STAGES = [
     ("grilling", s_grilling),
     ("sync", s_sync),
     ("screen", s_screen),
+    ("notebook", s_notebook),
     ("extract", s_extract),
     ("pdf", s_pdf),
     ("verify", s_verify),

@@ -2,7 +2,7 @@
 and the draft reviews, marked by rsx.toml.
 
     project/
-      rsx.toml          title and the paths below
+      rsx.toml          title, the paths below, the Gemini Notebook
       refs.bib          Better BibTeX auto-export of the Zotero collection
       vault/            the obs vault (claims, statements, questions, ...)
       paper/main.typ    the draft
@@ -21,13 +21,16 @@ from obs.vault import MARKER as VAULT_MARKER
 from obs.vault import Vault
 
 MARKER = "rsx.toml"
-KEYS = ("title", "vault", "bib", "doc", "reviews")
+KEYS = ("title", "vault", "bib", "doc", "reviews", "notebook")
 DEFAULTS = {
     "title": "Literature research",
     "vault": "vault",
     "bib": "refs.bib",
     "doc": "paper/main.typ",
     "reviews": "reviews",
+    # Gemini Notebook holding the included PDFs: gnb library ID or URL;
+    # "none" = work from the local PDFs only; "" = not decided yet
+    "notebook": "",
 }
 
 DOC_TEMPLATE = """// Draft for {title}. Written by lit-writer, reviewed by lit-critic.
@@ -62,6 +65,7 @@ class Project:
     bib: Path
     doc: Path
     reviews: Path
+    notebook: str = ""
 
     @property
     def vault(self) -> Vault:
@@ -105,6 +109,7 @@ def load(root: Path) -> Project:
         bib=(root / cfg["bib"]).resolve(),
         doc=(root / cfg["doc"]).resolve(),
         reviews=(root / cfg["reviews"]).resolve(),
+        notebook=cfg["notebook"],
     )
 
 
@@ -124,6 +129,14 @@ def find(start: Path | None = None) -> Project:
         f"no litflow project from {here} upwards (no {MARKER}). "
         "Run `rsx init PATH --title ...`, cd into the project, or set $RSX_PROJECT."
     )
+
+
+def set_key(project: Project, key: str, value: str) -> Project:
+    """Change one key of rsx.toml, keeping the others."""
+    path = project.root / MARKER
+    cfg = {**DEFAULTS, **parse_toml(path.read_text(encoding="utf-8")), key: value}
+    path.write_text(write_toml(cfg), "utf-8")
+    return load(project.root)
 
 
 def init(path: Path, title: str) -> Project:

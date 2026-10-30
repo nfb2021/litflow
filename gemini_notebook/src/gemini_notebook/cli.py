@@ -8,7 +8,9 @@
     gnb cleanup [--confirm]
 """
 
+import contextlib
 import json
+import sys
 from pathlib import Path
 
 import typer
@@ -90,11 +92,31 @@ def ask(
     notebook: str | None = typer.Option(None, "--notebook", "-n", help=NOTEBOOK_HELP),
     show_browser: bool = typer.Option(False, "--show-browser", help=SHOW_BROWSER_HELP),
     timeout: int = typer.Option(240, help="Seconds to wait for the answer"),
+    as_json: bool = typer.Option(
+        False,
+        "--json",
+        help="Print only {question, notebook, answer} as JSON (progress goes to stderr)",
+    ),
 ):
     """Ask a notebook a question; the answer comes only from its sources."""
     from .ask import ask_notebook
 
     notebook_url = _resolve_notebook(notebook)
+    if as_json:
+        with contextlib.redirect_stdout(sys.stderr):
+            answer = ask_notebook(
+                question,
+                notebook_url,
+                headless=not show_browser,
+                timeout=timeout,
+                reminder=False,
+            )
+        if not answer:
+            typer.echo("❌ Failed to get answer", err=True)
+            raise typer.Exit(1)
+        out = {"question": question, "notebook": notebook_url, "answer": answer}
+        typer.echo(json.dumps(out, ensure_ascii=False, indent=2))
+        return
     answer = ask_notebook(
         question, notebook_url, headless=not show_browser, timeout=timeout
     )

@@ -21,8 +21,14 @@ Always pass `--by lit-reader`.
 ## Procedure for a paper (extract)
 
 1. `obs show KEY`, `obs map show M-0001` (what the questions need), `obs glossary`.
-2. Find passages: `obs pdf-text KEY --grep WORD` (try glossary aliases, German
-   and English words), then `obs pdf-text KEY --page N` around each hit.
+2. Start from the leads: `rsx leads KEY` lists, per question, what the Gemini
+   Notebook quoted from this paper, already looked up in the PDF: page and
+   the page's own words. A lead is a pointer, not evidence: read its page
+   (`obs pdf-text KEY --page N`) and decide what the paper really says there.
+   A `weak` lead is a paraphrase: find the real sentence on that page.
+   Then find what the notebook missed: `obs pdf-text KEY --grep WORD` (try
+   glossary aliases, German and English words), `obs pdf-text KEY --page N`
+   around each hit.
 3. For each finding that bears on a question of the map:
    a. `obs statement find "<proposition>"`; reuse a statement that says the same.
       Otherwise `obs statement add "<one proposition, the paper's strength, no names>"`.
@@ -33,8 +39,10 @@ Always pass `--by lit-reader`.
       list them with -c), `restates-uncited`, `disputes`.
    d. "quote not found" → nothing was saved. Copy again from `pdf-text`. A
       sentence broken by a line or page break: quote the part on one page.
-4. Search the paper for **every** question the action lists (`# Q-…: …`),
-   not only the ones your first findings touch. Grep its key terms, glossary
+4. Search the paper for **every** question the action lists (`# Q-…: …`) that
+   is not yet recorded (`obs show KEY`, section Searched: where the notebook
+   quoted nothing, a verifier checks that), not only the ones your first
+   findings touch. Grep its key terms, glossary
    aliases and their German and English forms, read the pages around hits,
    and check the abstract, results and conclusions. Then per question:
    `rsx searched KEY Q-… --found C-… [--found C-…] --by lit-reader`, or

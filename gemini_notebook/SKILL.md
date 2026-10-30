@@ -73,6 +73,7 @@ gnb ask "..." -n notebook-id
 gnb ask "..." -n "https://notebook.google.com/notebook/..."
 gnb ask "..." --timeout 400                      # long answers (default 240 s)
 gnb ask "..." --show-browser                     # debugging
+gnb ask "..." --json                             # {question, notebook, answer} for scripts
 ```
 
 ### Step 5: Add Sources to a Notebook
