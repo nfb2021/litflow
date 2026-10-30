@@ -488,3 +488,26 @@ def test_agents_and_workflows_are_wired():
 
     for script in set(re.findall(r'"script": "([^"]+)"', src)):
         assert (root / "pi" / "workflows" / script).exists(), script
+
+
+def test_drive_stops_for_the_user_and_on_a_stall(lf, monkeypatch):
+    from rsx import cli, plan
+
+    monkeypatch.setenv("SHELL", "/bin/sh")
+    r = lf.rsx("drive", "--pi", "exit 9 #")
+    assert "protocol" in r.output  # human step: Pi is not started
+    step = plan.Action("extract", "lit-reader", "Extract", "why")
+    monkeypatch.setattr(cli.plan, "plan", lambda p, ctx=None: [step])
+    r = lf.rsx("drive", "--pi", "true #", ok=False)
+    assert "no progress in two rounds" in r.output
+    assert len(list((lf.root / ".rsx" / "drive").glob("round-*.jsonl"))) == 2
+    r = lf.rsx("drive", "--pi", "exit 9 #", ok=False)
+    assert "pi exited 9" in r.output
+
+
+def test_review_refused_in_the_lead_pi_session(lf, monkeypatch):
+    monkeypatch.setenv("PI_SESSION_ID", "lead-session")
+    r = lf.rsx(
+        "review", "Q-0001", "--ok", "--note", "x", "--by", "lit-critic", ok=False
+    )
+    assert "lit-critic's job" in r.output

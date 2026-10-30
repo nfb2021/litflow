@@ -6,6 +6,8 @@ resolve in Obsidian and here. Links live in frontmatter as "[[id]]" strings.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import re
 import unicodedata
@@ -100,6 +102,71 @@ def parse(text: str) -> tuple[dict, str]:
     if not isinstance(fm, dict):
         raise ValueError("frontmatter is not a mapping")
     return fm, m.group(2)
+
+
+# Evidence fields obs seals when it writes a note. A note whose seal no longer
+# matches was edited outside obs, so its checks (quote lookup, verifier,
+# answer) no longer hold for what it says now.
+SEALED: dict[str, tuple[str, ...]] = {
+    "claim": (
+        "statement",
+        "paper",
+        "role",
+        "quote",
+        "page",
+        "cites",
+        "drift",
+        "verification",
+        "extracted_by",
+        "verified_by",
+    ),
+    "question": (
+        "status",
+        "claims",
+        "statements",
+        "answered_by",
+        "review",
+        "reviewed_by",
+        "review_of",
+    ),
+}
+SEALED_SECTIONS: dict[str, tuple[str, ...]] = {"question": ("Answer",)}
+
+
+def seal_of(type_: str, fm: dict, body: str) -> str | None:
+    """Hash of the sealed fields of a note, None for unsealed types."""
+    if type_ not in SEALED:
+        return None
+    data = {
+        "fm": {f: fm.get(f) for f in SEALED[type_]},
+        "sections": {h: get_section(body, h) for h in SEALED_SECTIONS.get(type_, ())},
+    }
+    raw = json.dumps(data, sort_keys=True, ensure_ascii=False, default=str)
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def stamp_seal(type_: str, fm: dict, body: str) -> None:
+    seal = seal_of(type_, fm, body)
+    if seal:
+        fm["seal"] = seal
+
+
+def lead_session() -> bool:
+    """True inside the lead's own Pi session; Pi gives its subagents' shells
+    no PI_SESSION_ID (background children set PI_SUBAGENT_CHILD=1)."""
+    return bool(os.environ.get("PI_SESSION_ID")) and (
+        os.environ.get("PI_SUBAGENT_CHILD") != "1"
+    )
+
+
+def refuse_lead(role: str, what: str) -> str | None:
+    """The error to show when the lead tries to do ROLE's work itself."""
+    if not lead_session():
+        return None
+    return (
+        f"{what} is {role}'s job and this is the lead's session. "
+        "Delegate it: run the workflow that `rsx next --json` names."
+    )
 
 
 def render(fm: dict, body: str) -> str:
@@ -212,12 +279,14 @@ class Vault:
         path = self.root / TYPES[type_][0] / f"{note_id}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
         fm = {"id": note_id, "type": type_, **fm}
+        stamp_seal(type_, fm, body)
         path.write_text(render(fm, body), encoding="utf-8")
         note = Note(note_id, type_, path, fm, body)
         self.notes[note_id] = note
         return note
 
     def save(self, note: Note) -> None:
+        stamp_seal(note.type, note.fm, note.body)
         note.path.write_text(render(note.fm, note.body), encoding="utf-8")
 
 

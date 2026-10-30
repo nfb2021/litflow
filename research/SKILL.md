@@ -103,4 +103,11 @@ is Typst (`typst` skill).
   blocks. If a gate seems wrong, tell the user; do not work around it.
 - Keep agents apart: the verifier never extracts what it verifies, the critic
   never reviews its own answer; `obs` and `rsx` refuse it, by `--by` name.
+  In Pi, `obs claim add`, `obs verify`, `rsx review` and `rsx draft` refuse
+  to run in the lead's own session: delegate them.
+- Change notes only with `obs` and `rsx`. A claim or answer written or edited
+  by hand fails `obs lint` (`hand-edited`); `obs reseal ID --by lead` accepts
+  the edit and sends the note back to the verifier or critic.
+- Do not end a reply with what you will do next; do it. `rsx drive` restarts
+  a lead that stops early.
 - Report to the user in claims and independent sources, not paper counts.

@@ -28,6 +28,8 @@ Always pass `--by lit-verifier`.
    d. Ask, and answer from the page only:
       - Is the quote on the page, as quoted?
       - Does it say the statement, or only something near it?
+      - Is it the right statement at all? A quote about another topic
+        than its statement is rejected ("wrong statement: …").
       - Is the statement stronger than the quote? (hedges dropped, "may" became
         "does", one case became all) → `--drift strengthened`.
       - Role right? `origin` needs the paper's own data/derivation; if it cites

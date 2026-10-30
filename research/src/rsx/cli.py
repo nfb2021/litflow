@@ -9,12 +9,21 @@ from __future__ import annotations
 import datetime as dt
 import json
 import os
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
 
 import typer
-from obs.vault import VaultError, get_section, link, parse, render, set_section
+from obs.vault import (
+    VaultError,
+    get_section,
+    link,
+    parse,
+    refuse_lead,
+    render,
+    set_section,
+)
 
 from rsx import __version__, cite, gates, plan, review
 from rsx import project as proj
@@ -404,6 +413,8 @@ def review_cmd(
     project: Path = ProjectOpt,
 ) -> None:
     """Review an answered question. --block sends it back to the frontier."""
+    if err := refuse_lead("lit-critic", "Reviewing answers"):
+        fail(err)
     p = open_project(project)
     try:
         q = review.review_question(p.vault, question, _verdict(ok, block), note, by)
@@ -449,6 +460,8 @@ def cite_check(
 @draft_app.command("submit")
 def draft_submit(by: str = ByOpt, project: Path = ProjectOpt) -> None:
     """Check the draft (cite-check, typst compile) and submit it for review."""
+    if err := refuse_lead("lit-writer", "Submitting the draft"):
+        fail(err)
     p = open_project(project)
     x = Ctx.of(p)
     g = gates.gate(x, "write")
@@ -476,6 +489,8 @@ def draft_review(
     project: Path = ProjectOpt,
 ) -> None:
     """Review the submitted draft. Findings are required either way."""
+    if err := refuse_lead("lit-critic", "Reviewing the draft"):
+        fail(err)
     p = open_project(project)
     findings = file.read_text("utf-8") if file else (text or "")
     try:
@@ -536,6 +551,74 @@ def pi_install(
     typer.echo(
         f"{path}: litflow added (backup: {path.with_suffix('.json.bak').name}). Restart pi or /reload."
     )
+
+
+LEAD_PROMPT = (
+    "/skill:research You are the lead of the litflow project in the current folder. "
+    "Run `rsx status`, then repeat: `rsx next --json`, carry out the step it names, "
+    "run its gate. Delegate every lit-* step with the subagent tool: the workflow "
+    "it names, with its args and cwd set to this folder. Do not write vault files "
+    "yourself; use obs and rsx. Never end a reply with a plan: call the tool. "
+    "Stop when rsx next says done or needs the user, and report what is stuck."
+)
+
+
+def _progress(p: proj.Project) -> str:
+    """What `rsx drive` compares between rounds: the plan and the files."""
+    actions = [(a.stage, a.role, a.title, a.items) for a in plan.plan(p)]
+    files = sorted(
+        (str(f.relative_to(p.root)), f.stat().st_mtime_ns)
+        for f in p.root.rglob("*")
+        if f.is_file() and ".rsx" not in f.parts and ".obs" not in f.parts
+    )
+    return json.dumps([actions, files])
+
+
+@app.command()
+def drive(
+    model: str = typer.Option(
+        None, "--model", help="Pi model for the lead, e.g. aqueduct/qwen-3.6-35b"
+    ),
+    rounds: int = typer.Option(8, "--rounds", help="At most this many Pi runs"),
+    pi: str = typer.Option(
+        "pi",
+        "--pi",
+        help="Command that starts Pi; runs in your interactive shell, so a shell function works",
+    ),
+    project: Path = ProjectOpt,
+) -> None:
+    """Run the Pi lead again until the workflow is done, needs the user, or stalls.
+
+    Weak models end a run while saying what they will do next; each round
+    starts the lead fresh on the same project. Logs: .rsx/drive/.
+    """
+    p = open_project(project)
+    logs = p.root / ".rsx" / "drive"
+    logs.mkdir(parents=True, exist_ok=True)
+    shell = os.environ.get("SHELL", "/bin/zsh")
+    cmd = f"{pi} -p --mode json" + (f" --model {shlex.quote(model)}" if model else "")
+    cmd += f" {shlex.quote(LEAD_PROMPT)}"
+    stalled = 0
+    for n in range(1, rounds + 1):
+        first = plan.plan(p)[0]
+        if first.stage == "done" or first.role == "human":
+            typer.echo(f"{first.stage}: {first.title}")
+            return
+        before = _progress(p)
+        log = logs / f"round-{n:02d}.jsonl"
+        info(
+            f"round {n}: {first.stage} -> {first.role} ({first.title}); log {p.rel(log)}"
+        )
+        with log.open("w", encoding="utf-8") as out:
+            r = subprocess.run(
+                [shell, "-ic", cmd], cwd=p.root, stdout=out, stderr=subprocess.STDOUT
+            )
+        if r.returncode:
+            fail(f"pi exited {r.returncode} in round {n}; see {p.rel(log)}")
+        stalled = 0 if _progress(p) != before else stalled + 1
+        if stalled == 2:
+            fail(f"no progress in two rounds; still at: {plan.plan(p)[0].title}")
+    typer.echo(f"stopped after {rounds} rounds at: {plan.plan(p)[0].title}")
 
 
 @app.command()

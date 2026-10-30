@@ -85,6 +85,15 @@ read it:
 They are in [`pi/agents/`](pi/agents/) and load through the repository's `package.json`. The
 lead is the main Pi session (or Claude Code) following [SKILL.md](SKILL.md).
 
+The lead only orchestrates. In Pi, `obs claim add`, `obs verify`, `rsx review` and `rsx draft
+submit|review` refuse to run in the lead's own session (it has `PI_SESSION_ID`; its subagents'
+shells do not), and `obs lint` blocks claims and answers written by hand. So the lead cannot
+quietly do the reader's, verifier's or critic's job.
+
+Weak models often end a run with a plan instead of a tool call. `rsx drive --model
+aqueduct/qwen-3.6-35b` starts the lead again on the same project until `rsx next` says done or
+needs the user, and stops after two rounds without progress. Logs go to `.rsx/drive/`.
+
 ## Workflows
 
 For steps with many items, `rsx next --json` names a pi-subagents workflow script and its
@@ -148,6 +157,7 @@ refuse a reviewer whose `--by` name is the author's.
 | `rsx review Q-… --ok\|--block --note N --by R` | review an answer |
 | `rsx cite-check [DOC] [--json]` | check the draft's citations |
 | `rsx draft submit\|review\|show` | the draft's review cycle |
+| `rsx drive [--model M] [--rounds N] [--pi CMD]` | run the Pi lead again until done, a human step, or two rounds without progress |
 | `rsx doctor`, `rsx pi install` | setup |
 
 ## Development
