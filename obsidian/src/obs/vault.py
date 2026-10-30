@@ -151,8 +151,7 @@ def stamp_seal(type_: str, fm: dict, body: str) -> None:
         fm["seal"] = seal
 
 
-# Pi sets these in the shell of the main session; its in-process subagents'
-# shells get none of them
+# Pi sets these in the shell of every session it runs, lead and subagents
 PI_SESSION_VARS = (
     "PI_SESSION_ID",
     "PI_SESSION_FILE",
@@ -162,10 +161,22 @@ PI_SESSION_VARS = (
 )
 
 
+def _subagent_session(file: str) -> bool:
+    """A pi-subagents child keeps its session inside its parent's:
+    <parent>/<run id>/run-N/session.jsonl next to <parent>.jsonl."""
+    path = Path(file)
+    if path.name != "session.jsonl" or not re.fullmatch(r"run-\d+", path.parent.name):
+        return False
+    parent = path.parents[2]
+    return path.is_file() and parent.with_name(parent.name + ".jsonl").is_file()
+
+
 def lead_session() -> bool:
-    """True inside the lead's own Pi session. Any of the variables counts,
-    set or empty, so overriding one does not make the lead a subagent."""
-    return any(v in os.environ for v in PI_SESSION_VARS)
+    """True inside the lead's own Pi session, False in its subagents' and
+    outside Pi. Any of the variables counts, set or empty."""
+    if not any(v in os.environ for v in PI_SESSION_VARS):
+        return False
+    return not _subagent_session(os.environ.get("PI_SESSION_FILE", ""))
 
 
 def refuse_lead(role: str, what: str) -> str | None:
