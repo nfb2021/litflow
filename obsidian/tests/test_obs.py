@@ -531,3 +531,17 @@ def test_no_vault(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     r = CliRunner().invoke(app, ["status"])
     assert r.exit_code == 1 and "obs init" in r.output
+
+
+def test_vault_found_through_litflow_project(tmp_path, monkeypatch):
+    from obs.vault import find_root
+
+    monkeypatch.delenv("OBS_VAULT", raising=False)
+    runner = CliRunner()
+    assert runner.invoke(app, ["init", str(tmp_path / "notes")]).exit_code == 0
+    (tmp_path / "rsx.toml").write_text('title = "x"\nvault = "notes"\n')
+    (tmp_path / "paper").mkdir()
+    assert find_root(tmp_path / "paper") == (tmp_path / "notes").resolve()
+    (tmp_path / "rsx.toml").write_text('vault = "elsewhere"\n')
+    with pytest.raises(Exception, match="no vault found"):
+        find_root(tmp_path / "paper")

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Find the vault through a litflow project: run from a folder with `rsx.toml`,
+  `obs` uses the vault it names (default `vault/`).
+
 ## 0.1.0
 
 - `obs` CLI: vault init, paper sync from Better BibTeX `.bib`, screening,
