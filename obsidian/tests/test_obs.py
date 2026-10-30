@@ -283,9 +283,19 @@ def test_verify_refused_in_the_lead_pi_session(obs, monkeypatch):
     monkeypatch.setenv("PI_SESSION_ID", "")  # emptied, but other vars remain
     monkeypatch.setenv("PI_MODEL", "qwen")
     assert "Delegate it" in obs(*verify, ok=False).output
-    for var in ("PI_SESSION_ID", "PI_MODEL"):
-        monkeypatch.delenv(var)
-    obs(*verify)  # a subagent's shell has no PI_ session variables
+    sessions = obs.root.parent / "sessions"
+    (sessions / "lead").mkdir(parents=True)
+    (sessions / "lead.jsonl").write_text("{}")
+    fake = sessions / "lead" / "run-0" / "session.jsonl"  # no run id level
+    fake.parent.mkdir()
+    fake.write_text("{}")
+    monkeypatch.setenv("PI_SESSION_FILE", str(fake))
+    assert "Delegate it" in obs(*verify, ok=False).output
+    child = sessions / "lead" / "21b5ee82" / "run-0" / "session.jsonl"
+    child.parent.mkdir(parents=True)
+    child.write_text("{}")
+    monkeypatch.setenv("PI_SESSION_FILE", str(child))
+    obs(*verify)  # a pi-subagents child of the lead
 
 
 def test_hand_edit_breaks_the_seal(obs):
