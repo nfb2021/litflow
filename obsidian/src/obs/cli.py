@@ -22,10 +22,12 @@ from obs.vault import (
     Q_KINDS,
     ROLES,
     SCHEMA,
+    SEALED,
     TYPES,
     Vault,
     VaultError,
     link,
+    refuse_lead,
     set_section,
     slugify,
 )
@@ -500,6 +502,8 @@ def claim_add(
     The quote is looked up in the paper's PDF; a quote that is not there is
     refused (copy the exact wording).
     """
+    if err := refuse_lead("lit-reader", "Extracting claims"):
+        fail(err)
     v = open_vault(vault)
     if role not in ROLES:
         fail(f"--role must be one of {', '.join(ROLES)}")
@@ -698,6 +702,8 @@ def verify(
     """Record an independent verifier's verdict on a claim."""
     if verified is None:
         fail("pass --verified or --rejected")
+    if err := refuse_lead("lit-verifier", "Verifying claims"):
+        fail(err)
     v = open_vault(vault)
     try:
         c = v.get(claim, "claim")
@@ -721,6 +727,40 @@ def verify(
     )
     v.save(c)
     typer.echo(f"{c.id}: {c.fm['verification']}")
+
+
+@app.command()
+def reseal(
+    note_id: str,
+    by: str = typer.Option(..., "--by", help="Who accepts the hand edit"),
+    vault: Path = VaultOpt,
+) -> None:
+    """Accept a hand-edited claim or question, and send it back to be checked.
+
+    A claim loses its verification and has its quote looked up again; a
+    question loses its review.
+    """
+    v = open_vault(vault)
+    try:
+        n = v.get(note_id)
+    except VaultError as e:
+        fail(str(e))
+    if n.type not in SEALED:
+        fail(f"{n.id} is a {n.type}; only claims and questions are sealed")
+    if n.type == "claim":
+        if n.fm.get("verification") != "unverified":
+            n.fm["verification"] = "unverified"
+            for f in ("verified_by", "verify_note", "verified"):
+                n.fm.pop(f, None)
+        _apply_check(v, n, _check_claim(v, n))
+    else:
+        for f in ("review", "reviewed_by", "reviewed", "review_of"):
+            n.fm.pop(f, None)
+    n.fm["resealed_by"] = by
+    n.fm["resealed"] = today()
+    v.save(n)
+    again = "verified" if n.type == "claim" else "reviewed"
+    typer.echo(f"{n.id}: resealed; it must be {again} again")
 
 
 # --- maps and questions -----------------------------------------------------

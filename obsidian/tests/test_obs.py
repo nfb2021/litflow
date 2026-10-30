@@ -269,6 +269,55 @@ def test_verify_needs_another_agent(obs):
     assert t["verdict"] == "supported" and t["independent_sources"] == 1
 
 
+def test_verify_refused_in_the_lead_pi_session(obs, monkeypatch):
+    obs("statement", "add", "VOD increases with canopy water content")
+    claim = ["claim", "add", "-p", "doe2026gnsst", "-s", "S-0001", "-q", QUOTE]
+    claim += ["-r", "origin", "--by", "lit-reader"]
+    monkeypatch.setenv("PI_SESSION_ID", "lead-session")
+    assert "lead's session" in obs(*claim, ok=False).output
+    monkeypatch.delenv("PI_SESSION_ID")
+    obs(*claim)
+    monkeypatch.setenv("PI_SESSION_ID", "lead-session")
+    verify = ["verify", "C-0001", "--verified", "--by", "lit-verifier", "--note", "p1"]
+    assert "Delegate it" in obs(*verify, ok=False).output
+    monkeypatch.setenv("PI_SESSION_ID", "")  # emptied, but other vars remain
+    monkeypatch.setenv("PI_MODEL", "qwen")
+    assert "Delegate it" in obs(*verify, ok=False).output
+    for var in ("PI_SESSION_ID", "PI_MODEL"):
+        monkeypatch.delenv(var)
+    obs(*verify)  # a subagent's shell has no PI_ session variables
+
+
+def test_hand_edit_breaks_the_seal(obs):
+    obs("statement", "add", "VOD increases with canopy water content")
+    obs("statement", "add", "Something else entirely")
+    obs(
+        *["claim", "add", "-p", "doe2026gnsst", "-s", "S-0001", "-q", QUOTE],
+        *["-r", "origin", "--by", "reader"],
+    )
+    obs("verify", "C-0001", "--verified", "--by", "verifier", "--note", "p1")
+    assert json.loads(obs("lint", "--gate").stdout)["verdict"] == "pass"
+    path = obs.root / "claims" / "C-0001.md"
+    path.write_text(path.read_text().replace("[[S-0001]]", "[[S-0002]]"))
+    g = json.loads(obs("lint", "--gate").stdout)
+    assert [i["code"] for i in g["issues"] if i["level"] == "error"] == ["hand-edited"]
+    obs("reseal", "C-0001", "--by", "lead")
+    assert "verification: unverified" in path.read_text()
+    assert json.loads(obs("lint", "--gate").stdout)["errors"] == 0
+
+
+def test_hand_written_claim_has_no_seal(obs):
+    obs("statement", "add", "VOD increases with canopy water content")
+    (obs.root / "claims").mkdir(exist_ok=True)
+    (obs.root / "claims" / "C-0009.md").write_text(
+        "---\nid: C-0009\ntype: claim\nstatement: '[[S-0001]]'\n"
+        "paper: '[[doe2026gnsst]]'\nrole: origin\nquote: x\npage: '1'\n"
+        "verification: verified\nextracted_by: a\nverified_by: b\n---\n"
+    )
+    issues = json.loads(obs("lint", "--gate").stdout)["issues"]
+    assert any(i["code"] == "hand-edited" and i["note"] == "C-0009" for i in issues)
+
+
 # --- provenance ---------------------------------------------------------------
 def _claim(obs, paper, st, role, *cites, quote=None):
     args = [

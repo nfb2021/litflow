@@ -32,7 +32,7 @@ auto-export of their Zotero collection at `PATH/refs.bib`.
    - **lead**: you do it (map, sync, stuck tickets).
    - **lit-scout / lit-reader / lit-verifier / lit-critic / lit-writer**:
      delegate. In Pi, run the action's `workflow` (below) or one agent:
-     `subagent({ agent: "lit-reader", task: "<the action's title, items and commands>", cwd: "<project>" })`.
+     `subagent({ agent: "lit-reader", task: "<the action's title, items and commands>", cwd: "<project>", async: false })`.
      Without subagents, do the role yourself, one role per session, following
      `pi/agents/<role>.md`, and never review your own work.
 3. Gate: `rsx gate STAGE [...]` prints `{"verdict": "pass"|"blocked", "issues": [...]}`.
@@ -43,10 +43,11 @@ auto-export of their Zotero collection at `PATH/refs.bib`.
 ## Workflows (Pi with pi-subagents)
 
 `rsx next --json` gives each delegated action a `workflow` with the script's
-absolute path and its args. Run it as one call:
+absolute path and its args. Run it as one blocking call (`async: false`; a
+background run fails or leaves you polling):
 
 ```js
-subagent({ workflow: "<workflow.script>", args: <workflow.args>, cwd: "<project folder>" })
+subagent({ workflow: "<workflow.script>", args: <workflow.args>, cwd: "<project folder>", async: false })
 ```
 
 | Script | Does |
@@ -103,4 +104,11 @@ is Typst (`typst` skill).
   blocks. If a gate seems wrong, tell the user; do not work around it.
 - Keep agents apart: the verifier never extracts what it verifies, the critic
   never reviews its own answer; `obs` and `rsx` refuse it, by `--by` name.
+  In Pi, `obs claim add`, `obs verify`, `rsx review` and `rsx draft` refuse
+  to run in the lead's own session: delegate them.
+- Change notes only with `obs` and `rsx`. A claim or answer written or edited
+  by hand fails `obs lint` (`hand-edited`); `obs reseal ID --by lead` accepts
+  the edit and sends the note back to the verifier or critic.
+- Do not end a reply with what you will do next; do it. `rsx drive` restarts
+  a lead that stops early.
 - Report to the user in claims and independent sources, not paper counts.

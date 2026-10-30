@@ -48,6 +48,7 @@ FIXER = {
     "verified-by-nobody": "lit-verifier",
     "agent-answered-grilling": "human",
     "answer-without-evidence": "lit-reader",
+    "hand-edited": "lead",
 }
 CRITERION = re.compile(r"^\s*[IE]\d+\b")
 

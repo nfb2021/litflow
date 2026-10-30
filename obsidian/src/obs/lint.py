@@ -14,6 +14,7 @@ from obs.vault import (
     TYPES,
     VERIFICATION,
     Vault,
+    seal_of,
 )
 
 
@@ -55,6 +56,19 @@ def lint(vault: Vault) -> list[dict]:
                     n.id,
                     f"frontmatter id {n.fm['id']!r} differs from the file name",
                     "rename the file or fix `id`",
+                )
+            )
+        seal = seal_of(n.type, n.fm, n.body)
+        if seal and n.fm.get("seal") != seal:
+            out.append(
+                _issue(
+                    "error",
+                    "hand-edited",
+                    n.id,
+                    "written or changed outside obs, so its checks no longer hold"
+                    if n.fm.get("seal")
+                    else "has no seal: written outside obs",
+                    f"redo it with the obs command (claim add / verify / q answer), or `obs reseal {n.id} --by WHO`, which sends it back to be checked",
                 )
             )
         for f in LINK_FIELDS[n.type]:

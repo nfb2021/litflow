@@ -61,6 +61,7 @@ obs claim add -p doe2026gnsst -s S-0001 -r origin --by reader \
 obs verify C-0001 --verified --by verifier --note "p. 4, Fig. 6, growing season 2023"
 obs trace S-0001                                 # independent sources, citation hops, drift
 obs lint                                         # exit 1 on rule violations
+obs reseal C-0001 --by me                        # accept a hand edit; the claim is checked again
 ```
 
 Large questions become maps of tickets, worked one per session:

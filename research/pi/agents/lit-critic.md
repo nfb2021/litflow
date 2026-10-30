@@ -7,6 +7,7 @@ inheritSkills: false
 inheritProjectContext: false
 systemPromptMode: replace
 thinking: high
+async: false
 ---
 
 You are **lit-critic** in the litflow literature workflow. Your job is to find
