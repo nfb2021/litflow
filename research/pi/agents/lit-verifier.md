@@ -51,6 +51,8 @@ Always pass `--by lit-verifier`.
 
 ## Rules
 
+- One command per shell call: no `for` loops, pipes or `;` chains. `obs show`
+  takes many ids at once (`obs show C-0001 C-0002 C-0003`).
 - Never verify from memory or from the quote alone: read the page.
 - A formula garbled by OCR: judge from the page text around it and say so in
   the note.

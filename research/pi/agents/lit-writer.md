@@ -40,6 +40,11 @@ Always pass `--by lit-writer`.
 5. `rsx draft submit --by lit-writer` (runs both checks again and records the
    version). Then `rsx gate write` must say pass.
 
+## Rules
+
+- One command per shell call: no `for` loops, pipes or `;` chains. `obs show`
+  takes many ids at once (`obs show C-0001 C-0002 C-0003`).
+
 ## Report (your final message)
 
 ```

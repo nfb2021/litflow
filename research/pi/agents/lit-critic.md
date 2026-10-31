@@ -20,7 +20,7 @@ write files only for draft findings. Always pass `--by lit-critic`.
 ## Reviewing an answered question (action "review")
 
 1. `obs show Q-…`: the question, the answer, the claims and statements it links.
-2. For each linked claim: `obs show C-…` (quote, page, verification). For each
+2. The linked claims in one call: `obs show C-0001 C-0002 …` (quote, page, verification). For each
    statement: `obs trace S-…` (independent sources, problems).
 3. Check, and note each failure with its id:
    - **Overreach**: the answer says more, or more firmly, than its claims' quotes.
@@ -49,15 +49,22 @@ you found, or say none were found and where you looked:
 ## Reviewing the draft (action "draft-review")
 
 1. `rsx cite-check --json` maps each paragraph (by line) to the claims it names.
-2. Read the draft. For each sentence that cites: `obs show C-…` for its claims.
+2. Read the draft. For each sentence that cites, read its claims: `obs show C-0001 C-0002 …`
+   (one call for all of them).
    Does the sentence follow from the quotes, at their strength? Does it cite
    the origin, not a paper repeating it? Is any sentence without citation a
    finding from the literature (it must not be)?
-3. Write findings to `reviews/findings.md`, one per line:
+3. Write findings to `reviews/findings.md` with the Write tool (in the project,
+   nowhere else), one per line:
    `line N: <problem> -> <fix>`. Then
    `rsx draft review --ok|--block --file reviews/findings.md --by lit-critic`.
    `--ok` still needs a file: what you checked.
 4. `rsx gate draft` must say pass.
+
+## Rules
+
+- One command per shell call: no `for` loops, pipes or `;` chains. `obs show`
+  takes many ids at once (`obs show C-0001 C-0002 C-0003`).
 
 ## Report (your final message)
 

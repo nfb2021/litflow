@@ -41,6 +41,8 @@ Work in the project folder (it has `rsx.toml`). Use only these commands:
 
 ## Rules
 
+- One command per shell call: no `for` loops, pipes or `;` chains. `obs show`
+  takes many ids at once (`obs show C-0001 C-0002 C-0003`).
 - A DOI you have not seen in a search result or a reference list does not
   exist. Never type a DOI from memory.
 - Screening is not your job; do not screen.

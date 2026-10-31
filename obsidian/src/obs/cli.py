@@ -1140,16 +1140,21 @@ def ls(
 
 
 @app.command()
-def show(note_id: str, vault: Path = VaultOpt, as_json: bool = JsonOpt) -> None:
-    """A note with its frontmatter, body and backlinks."""
+def show(
+    note_ids: list[str] = typer.Argument(..., metavar="NOTE_ID..."),
+    vault: Path = VaultOpt,
+    as_json: bool = JsonOpt,
+) -> None:
+    """Notes with their frontmatter, body and backlinks; several ids in one call."""
     v = open_vault(vault)
     try:
-        n = v.get(note_id)
+        notes = [v.get(i) for i in note_ids]
     except VaultError as e:
         fail(str(e))
-    back = [(b.id, b.type, f) for b, f in v.backlinks(n.id)]
-    if as_json:
-        emit(
+    shown = []
+    for n in notes:
+        back = [(b.id, b.type, f) for b, f in v.backlinks(n.id)]
+        shown.append(
             {
                 "id": n.id,
                 "type": n.type,
@@ -1159,12 +1164,17 @@ def show(note_id: str, vault: Path = VaultOpt, as_json: bool = JsonOpt) -> None:
                 "backlinks": [{"id": i, "type": t, "field": f} for i, t, f in back],
             }
         )
+    if as_json:
+        emit(shown[0] if len(shown) == 1 else shown)
         return
-    typer.echo(n.path.read_text(encoding="utf-8"))
-    if back:
-        typer.echo("backlinks:")
-        for i, t, f in back:
-            typer.echo(f"  {i} ({t}, via {f})")
+    for n, d in zip(notes, shown, strict=True):
+        if len(notes) > 1:
+            typer.echo(f"=== {n.id}")
+        typer.echo(n.path.read_text(encoding="utf-8"))
+        if d["backlinks"]:
+            typer.echo("backlinks:")
+            for b in d["backlinks"]:
+                typer.echo(f"  {b['id']} ({b['type']}, via {b['field']})")
 
 
 @app.command()

@@ -118,7 +118,7 @@ session from a bounded set of sources.
 obs ls claim verification=unverified          # filters: = != ~(contains) > <
 obs ls paper year>2020 venue~remote -f year,venue
 obs ls claim paper=doe2026gnsst --json
-obs show S-0001                               # note + backlinks
+obs show S-0001 C-0001                        # notes + backlinks, many ids per call
 obs neighbors S-0001 --depth 2                # the local graph
 obs sql "select id, title from notes where type='statement'"   # tables: notes, links(src, field, dst)
 obs glossary

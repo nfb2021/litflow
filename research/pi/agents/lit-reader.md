@@ -76,6 +76,8 @@ Every sentence of the answer rests on a listed claim. Say what is missing.
 
 ## Rules
 
+- One command per shell call: no `for` loops, pipes or `;` chains. `obs show`
+  takes many ids at once (`obs show C-0001 C-0002 C-0003`).
 - Your background knowledge picks search words. It never becomes a statement.
 - One proposition per statement. A sentence with the paper's own result and a
   cited result is two claims: `origin` and `restates -c`.
