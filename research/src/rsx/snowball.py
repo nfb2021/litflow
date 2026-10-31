@@ -40,9 +40,16 @@ class SnowballError(Exception):
     """A refused snowball step, with what to do instead."""
 
 
+# Publishers (Wiley/AGU) deposit reference DOIs in Crossref with typographic
+# hyphens; one DOI must have one key.
+DASHES = dict.fromkeys(
+    map(ord, "\u00ad\u2010\u2011\u2012\u2013\u2014\u2015\u2212"), "-"
+)
+
+
 def norm(doi: str) -> str:
     doi = re.sub(r"^(https?://(dx\.)?doi\.org/|doi:\s*)", "", doi.strip(), flags=re.I)
-    return doi.rstrip(".,;").lower()
+    return doi.translate(DASHES).rstrip(".,;").lower()
 
 
 def today() -> str:
@@ -59,8 +66,24 @@ def state_path(p: Project) -> Path:
 def load(p: Project) -> dict:
     f = state_path(p)
     s = json.loads(f.read_text("utf-8")) if f.exists() else {}
-    s.setdefault("papers", {})
     s.setdefault("seeds", [])
+    s["seeds"] = list(dict.fromkeys(map(norm, s["seeds"])))
+    papers: dict = {}
+    for k, v in s.get("papers", {}).items():
+        for r in v.get("refs", {}).get("list", []):
+            if r.get("doi"):
+                r["doi"] = norm(r["doi"])
+        k = norm(k)
+        if k not in papers:
+            papers[k] = v
+            continue
+        # a duplicate written before norm() knew the hyphen: merge into the first
+        kept = papers[k]
+        kept["depth"] = min(kept["depth"], v["depth"])
+        kept["found_in"] = list(dict.fromkeys(kept["found_in"] + v["found_in"]))
+        for f, x in v.items():
+            kept.setdefault(f, x)
+    s["papers"] = papers
     return s
 
 
