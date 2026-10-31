@@ -114,3 +114,57 @@ def find_quote(quote: str, page_texts: list[str]) -> dict:
     if best[0] >= APPROX:
         return {"status": "approx", "page": best[1], "score": round(best[0], 3)}
     return {"status": "not-found", "page": best[1], "score": round(best[0], 3)}
+
+
+SENTENCE_END = re.compile(r"(?<=[.!?;:])\s+")
+
+
+def _printed(text: str) -> str:
+    """Page text as one line, hyphenation at line ends joined (as normalize does)."""
+    text = re.sub(r"(\w)-\s*\n\s*(\w)", r"\1\2", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _blocks(page_text: str) -> list[str]:
+    """Paragraphs, with headings (short lines without end punctuation) on their own."""
+    out: list[str] = []
+    for para in re.split(r"\n\s*\n", page_text):
+        block: list[str] = []
+        for line in para.splitlines():
+            block.append(line)
+            text = line.strip()
+            if text and len(text) < 50 and not re.search(r"[.!?:;,\-–]$", text):
+                out.append("\n".join(block))
+                block = []
+        if block:
+            out.append("\n".join(block))
+    return out
+
+
+def excerpt(quote: str, page_text: str, max_sentences: int = 6) -> tuple[str, float]:
+    """The sentence(s) of a page that contain a quote, as printed on the page.
+
+    For quotes that were paraphrased, translated or shortened on the way (a
+    notebook answer, a reader's memory): returns (text, score), where text is
+    copied from the page and so passes `find_quote` exactly, and score is the
+    share of the quote it covers. The shortest run of sentences with the best
+    score wins.
+    """
+    q = normalize(quote)
+    if not q:
+        return "", 0.0
+    sents = [
+        s for b in _blocks(page_text) for s in SENTENCE_END.split(_printed(b)) if s
+    ]
+    best: tuple[float, int, str] = (0.0, 0, "")
+    for i in range(len(sents)):
+        for j in range(i + 1, min(len(sents), i + max_sentences) + 1):
+            text = " ".join(sents[i:j])
+            t = normalize(text)
+            sm = SequenceMatcher(None, q, t, autojunk=False)
+            score = round(sum(b.size for b in sm.get_matching_blocks()) / len(q), 3)
+            if (score, -len(t)) > (best[0], best[1]):
+                best = (score, -len(t), text)
+            if len(t) > 2 * len(q) + 80:
+                break  # longer runs only add text
+    return best[2], best[0]

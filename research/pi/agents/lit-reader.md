@@ -21,8 +21,14 @@ Always pass `--by lit-reader`.
 ## Procedure for a paper (extract)
 
 1. `obs show KEY`, `obs map show M-0001` (what the questions need), `obs glossary`.
-2. Find passages: `obs pdf-text KEY --grep WORD` (try glossary aliases, German
-   and English words), then `obs pdf-text KEY --page N` around each hit.
+2. Start from the leads: `rsx leads KEY` lists, per question, what the Gemini
+   Notebook quoted from this paper, already looked up in the PDF: page and
+   the page's own words. A lead is a pointer, not evidence: read its page
+   (`obs pdf-text KEY --page N`) and decide what the paper really says there.
+   A `weak` lead is a paraphrase: find the real sentence on that page.
+   Then find what the notebook missed: `obs pdf-text KEY --grep WORD` (try
+   glossary aliases, German and English words), `obs pdf-text KEY --page N`
+   around each hit.
 3. For each finding that bears on a question of the map:
    a. `obs statement find "<proposition>"`; reuse a statement that says the same.
       Otherwise `obs statement add "<one proposition, the paper's strength, no names>"`.
@@ -33,9 +39,19 @@ Always pass `--by lit-reader`.
       list them with -c), `restates-uncited`, `disputes`.
    d. "quote not found" → nothing was saved. Copy again from `pdf-text`. A
       sentence broken by a line or page break: quote the part on one page.
-4. `rsx extracted KEY --by lit-reader` when done. Nothing relevant in it:
+4. Search the paper for **every** question the action lists (`# Q-…: …`) that
+   is not yet recorded (`obs show KEY`, section Searched: where the notebook
+   quoted nothing, a verifier checks that), not only the ones your first
+   findings touch. Grep its key terms, glossary
+   aliases and their German and English forms, read the pages around hits,
+   and check the abstract, results and conclusions. Then per question:
+   `rsx searched KEY Q-… --found C-… [--found C-…] --by lit-reader`, or
+   `rsx searched KEY Q-… --none --note "<words grepped, pages read>" --by lit-reader`.
+   A "none" is checked by lit-verifier, who searches the paper again; a
+   search whose claims are all rejected must be done again.
+5. `rsx extracted KEY --by lit-reader` when done. Nothing relevant in it:
    `rsx extracted KEY --none --note "<why>" --by lit-reader`.
-5. `rsx gate extract --paper KEY` must say pass. Fix what it lists (3 rounds max).
+6. `rsx gate extract --paper KEY` must say pass. Fix what it lists (3 rounds max).
 
 ## Screening (action "screen")
 
@@ -60,6 +76,8 @@ Every sentence of the answer rests on a listed claim. Say what is missing.
 
 ## Rules
 
+- One command per shell call: no `for` loops, pipes or `;` chains. `obs show`
+  takes many ids at once (`obs show C-0001 C-0002 C-0003`).
 - Your background knowledge picks search words. It never becomes a statement.
 - One proposition per statement. A sentence with the paper's own result and a
   cited result is two claims: `origin` and `restates -c`.

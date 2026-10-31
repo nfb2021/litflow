@@ -25,7 +25,7 @@ from obs.vault import (
     set_section,
 )
 
-from rsx import __version__, cite, gates, plan, review
+from rsx import __version__, cite, gates, notebook, plan, review
 from rsx import project as proj
 from rsx.plan import ROLES, Ctx
 
@@ -41,7 +41,12 @@ draft_app = typer.Typer(
 pi_app = typer.Typer(
     help="Set up Pi to load the litflow skills and agents.", no_args_is_help=True
 )
+notebook_app = typer.Typer(
+    help="The project's Gemini Notebook: connect it, add the included PDFs.",
+    no_args_is_help=True,
+)
 app.add_typer(draft_app, name="draft")
+app.add_typer(notebook_app, name="notebook")
 app.add_typer(pi_app, name="pi")
 
 ProjectOpt = typer.Option(
@@ -194,6 +199,7 @@ def status(project: Path = ProjectOpt, as_json: bool = JsonOpt) -> None:
         "answered": sum(
             q.fm.get("status") == "answered" for q in v.of_type("question")
         ),
+        "notebook": p.notebook or "(not set: rsx notebook use URL|none)",
         "draft": review.draft_state(p),
         "stage": nxt.stage,
         "next": f"{nxt.title} -> {nxt.role}",
@@ -205,6 +211,7 @@ def status(project: Path = ProjectOpt, as_json: bool = JsonOpt) -> None:
     typer.echo(
         f"  papers {data['papers']} ({data['included']} included)  claims {data['claims']} ({data['verified']} verified)  questions {data['questions']} ({data['answered']} answered)"
     )
+    typer.echo(f"  notebook {data['notebook']}")
     d = data["draft"]
     typer.echo(
         f"  draft {data['doc']}: submitted={d['submitted']} review={d['review'] or '-'}"
@@ -336,6 +343,392 @@ def not_in(
     )
     v.save(paper)
     typer.echo(f"{paper.id}: does not state {st.id}")
+
+
+def _search_target(v, key: str, question: str):
+    try:
+        paper = v.get(key, "paper")
+        q = v.get(question, "question")
+    except VaultError as e:
+        fail(str(e))
+    if q.id not in {x.id for x in plan.search_questions(v)}:
+        fail(f"{q.id} is not a question papers are searched for")
+    return paper, q
+
+
+def _log_search(paper, line: str) -> None:
+    log = get_section(paper.body, "Searched")
+    paper.body = set_section(paper.body, "Searched", (log + f"\n- {line}").strip())
+
+
+@app.command()
+def searched(
+    key: str = typer.Argument(..., help="Paper citekey"),
+    question: str = typer.Argument(..., help="The question it was searched for"),
+    found: list[str] = typer.Option(
+        None, "--found", help="Claims of this paper that bear on the question"
+    ),
+    none: bool = typer.Option(
+        False, "--none", help="The paper says nothing on the question"
+    ),
+    note: str = typer.Option("", "--note", help="Words and pages searched"),
+    by: str = ByOpt,
+    project: Path = ProjectOpt,
+) -> None:
+    """Record that a paper was searched for a question: the claims found, or none."""
+    if msg := refuse_lead("lit-reader", "Searching a paper"):
+        fail(msg)
+    p = open_project(project)
+    v = p.vault
+    paper, q = _search_target(v, key, question)
+    if paper.fm.get("screening") != "included":
+        fail(f"{paper.id} is {paper.fm.get('screening', 'pending')}, not included")
+    found = [c for f in found or [] for c in f.replace(",", " ").split()]
+    if bool(found) == none:
+        fail("give either --found C-… or --none")
+    if none and not note.strip():
+        fail("--none needs --note: the words and pages you searched")
+    own = {c.id: c for c in plan.claims_of(v, paper.id)}
+    for cid in found:
+        if cid not in own:
+            fail(f"{cid} is not a claim of {paper.id}")
+        if own[cid].fm.get("verification") == "rejected":
+            fail(f"{cid} was rejected; it cannot answer {q.id}")
+    if none and own:
+        hint = ", ".join(own)
+        info(f"{paper.id} has claims ({hint}); none of them bears on {q.id}?")
+    entry = {"by": by, "date": today()}
+    entry.update({"none": note.strip()} if none else {"found": found})
+    paper.fm["searched"] = {**(paper.fm.get("searched") or {}), q.id: entry}
+    what = f"nothing: {note.strip()}" if none else "found " + ", ".join(found)
+    _log_search(paper, f"{link(q.id)} ({today()}, {by}): {what}")
+    v.save(paper)
+    typer.echo(f"{paper.id}: searched for {q.id}, {what}")
+
+
+@app.command("confirm-none")
+def confirm_none(
+    key: str = typer.Argument(..., help="Paper citekey"),
+    question: str = typer.Argument(..., help="The question it was found silent on"),
+    dispute: bool = typer.Option(
+        False, "--dispute", help="The paper does bear on the question"
+    ),
+    note: str = typer.Option(..., "--note", help="What you searched, or what it says"),
+    by: str = ByOpt,
+    project: Path = ProjectOpt,
+) -> None:
+    """Check a reader's 'nothing in this paper' record by searching the paper again."""
+    if msg := refuse_lead("lit-verifier", "Checking a search"):
+        fail(msg)
+    p = open_project(project)
+    v = p.vault
+    paper, q = _search_target(v, key, question)
+    searched = dict(paper.fm.get("searched") or {})
+    entry = searched.get(q.id)
+    if not entry or "none" not in entry:
+        fail(f"{paper.id} has no 'nothing found' record for {q.id}")
+    if entry.get("by") == by:
+        fail(f"{by} recorded this search; a different agent checks it")
+    if dispute:
+        del searched[q.id]
+        verb = "disputed"
+    else:
+        searched[q.id] = {**entry, "confirmed_by": by, "confirmed": today()}
+        verb = "confirmed"
+    paper.fm["searched"] = searched
+    _log_search(paper, f"{link(q.id)} ({today()}, {by}): {verb}: {note.strip()}")
+    v.save(paper)
+    typer.echo(f"{paper.id}: nothing on {q.id} {verb}")
+
+
+@app.command()
+def coverage(
+    question: str = typer.Argument(None, help="One question; default: all of them"),
+    as_json: bool = typer.Option(False, "--json"),
+    project: Path = ProjectOpt,
+) -> None:
+    """What each included paper holds for a question: found claims, confirmed none, or unsearched."""
+    p = open_project(project)
+    v = p.vault
+    qs = plan.search_questions(v)
+    if question:
+        qs = [q for q in qs if q.id == question]
+        if not qs:
+            fail(f"{question} is not a question papers are searched for")
+    papers = [x for x in v.of_type("paper") if x.fm.get("screening") == "included"]
+    out = {}
+    for q in qs:
+        rows = {}
+        for paper in papers:
+            s = (paper.fm.get("searched") or {}).get(q.id)
+            if s is None:
+                rows[paper.id] = "unsearched"
+            elif "none" in s:
+                rows[paper.id] = (
+                    "none (confirmed)"
+                    if s.get("confirmed_by")
+                    else "none (unconfirmed)"
+                )
+            else:
+                ok = [
+                    c
+                    for c in s["found"]
+                    if c in v.notes and v.notes[c].fm.get("verification") == "verified"
+                ]
+                rows[paper.id] = "found " + (", ".join(ok) or "(none verified)")
+        out[q.id] = rows
+    if as_json:
+        typer.echo(json.dumps(out, indent=2))
+        return
+    for q in qs:
+        typer.echo(f"{q.id}: {q.title}")
+        for key, row in out[q.id].items():
+            typer.echo(f"  {key}: {row}")
+
+
+@notebook_app.command("use")
+def notebook_use(
+    notebook_ref: str = typer.Argument(
+        ...,
+        metavar="NOTEBOOK",
+        help="Notebook URL or gnb library ID; 'none' = local PDFs only",
+    ),
+    project: Path = ProjectOpt,
+) -> None:
+    """Set the project's Gemini Notebook (the user decides this, not an agent)."""
+    p = proj.set_key(open_project(project), "notebook", notebook_ref.strip())
+    typer.echo(f"notebook: {p.notebook}")
+    if p.notebook != "none":
+        info("next: `rsx notebook push` adds the included PDFs")
+
+
+@notebook_app.command("push")
+def notebook_push(
+    batch: int = typer.Option(10, help="PDFs per `gnb add` call"),
+    mark_only: bool = typer.Option(
+        False,
+        "--mark-only",
+        help="The PDFs are in the notebook already (e.g. `zot push`): only record that",
+    ),
+    project: Path = ProjectOpt,
+) -> None:
+    """Add the PDFs of the included papers that are not in the notebook yet."""
+    from obs.cli import paper_pdf
+
+    p = open_project(project)
+    if p.notebook in ("", "none"):
+        fail("no notebook set: `rsx notebook use URL`")
+    v = p.vault
+    todo = [
+        (x, paper_pdf(v, x))
+        for x in v.of_type("paper")
+        if x.fm.get("screening") == "included" and not x.fm.get("in_notebook")
+    ]
+    todo = [(x, pdf) for x, pdf in todo if pdf]
+    if not todo:
+        typer.echo("every included PDF is in the notebook")
+        return
+    total = len(notebook.in_notebook(v)) + len(todo)
+    if total > 50:
+        info(f"⚠️  {total} sources: the free plan holds 50 per notebook (Pro: 300)")
+    for start in range(0, len(todo), batch):
+        chunk = todo[start : start + batch]
+        if not mark_only:
+            cmd = [notebook.gnb(), "add", "-n", p.notebook]
+            for _, pdf in chunk:
+                cmd += ["-f", str(pdf)]
+            info(f"gnb add: PDFs {start + 1}-{start + len(chunk)} of {len(todo)}")
+            if subprocess.run(cmd).returncode != 0:
+                fail(
+                    "gnb add failed; rerun `rsx notebook push` (added PDFs are recorded)"
+                )
+        for x, _ in chunk:
+            x.fm["in_notebook"] = today()
+            v.save(x)
+    typer.echo(f"{len(todo)} PDF(s) in the notebook")
+
+
+def _lead_lines(lead: dict) -> str:
+    tag = (
+        "found"
+        if lead["status"] == "found"
+        else f"weak {lead['score']}, check the page"
+    )
+    return f'  p. {lead["page"]} ({tag}): "{lead["text"]}"'
+
+
+@app.command()
+def ask(
+    questions: list[str] = typer.Argument(
+        None,
+        help="Questions to ask; default: every one not asked since papers were added",
+    ),
+    timeout: int = typer.Option(400, help="Seconds to wait for each answer"),
+    as_json: bool = JsonOpt,
+    project: Path = ProjectOpt,
+) -> None:
+    """Ask the Gemini Notebook a question across all papers; turn its quotes into leads.
+
+    Each quote is looked up in the local PDF of every included paper. Papers
+    it quotes nothing from are recorded as searched with nothing found (by
+    "notebook"); a verifier confirms that by searching the PDF itself.
+    """
+    p = open_project(project)
+    if p.notebook in ("", "none"):
+        fail("no notebook set: `rsx notebook use URL`")
+    v = p.vault
+    papers = notebook.in_notebook(v)
+    if not papers:
+        fail("no included paper is in the notebook yet: `rsx notebook push`")
+    open_qs = plan.search_questions(v)
+    qs = (
+        [q for q in open_qs if q.id in set(questions)]
+        if questions
+        else [q for q in open_qs if notebook.needs_asking(q, papers)]
+    )
+    if questions and len(qs) != len(set(questions)):
+        fail(
+            f"not questions papers are searched for: {', '.join(sorted(set(questions) - {q.id for q in qs}))}"
+        )
+    texts = notebook.page_texts(v, papers)
+    results = {}
+    for q in qs:
+        info(f"asking the notebook {q.id}: {q.title}")
+        try:
+            answer = notebook.ask(p.notebook, notebook.prompt(q.title), timeout)
+            if notebook.summarised(answer):  # cites sources, quotes none: once more
+                info(f"  no quotes in the answer; asking {q.id} again for quotes")
+                answer = notebook.ask(
+                    p.notebook, notebook.prompt(q.title, strict=True), timeout
+                )
+        except notebook.NotebookError as e:
+            fail(f"{q.id}: {e}")
+        unsure = notebook.summarised(answer)
+        found = notebook.anchor(notebook.quotes(answer), texts)
+        record = {
+            "question": q.id,
+            "title": q.title,
+            "asked": today(),
+            "papers": sorted(x.id for x in papers),
+            "answer": answer,
+            **found,
+            "inconclusive": unsure,
+        }
+        path = notebook.save(p, q.id, record)
+        silent = []
+        # a summary without quotes says nothing about which papers are silent
+        for x in [] if unsure else papers:
+            searched = dict(x.fm.get("searched") or {})
+            s = searched.get(q.id)
+            if x.id in found["leads"]:
+                if s and s.get("by") == notebook.BY and "none" in s:
+                    del searched[q.id]  # a new answer quotes it after all
+                    _log_search(
+                        x,
+                        f"{link(q.id)} ({today()}, {notebook.BY}): now quoted; `rsx leads {x.id}`",
+                    )
+                else:
+                    continue
+            elif s is None:
+                silent.append(x.id)
+                searched[q.id] = {
+                    "by": notebook.BY,
+                    "date": today(),
+                    "none": f"the notebook quoted nothing from it ({p.rel(path)})",
+                }
+                _log_search(
+                    x, f"{link(q.id)} ({today()}, {notebook.BY}): nothing quoted"
+                )
+            else:
+                continue
+            x.fm["searched"] = searched
+            v.save(x)
+        q.fm["asked"] = {"date": today(), "title": q.title, "papers": record["papers"]}
+        v.save(q)
+        results[q.id] = {
+            **found,
+            "silent": silent,
+            "inconclusive": unsure,
+            "file": p.rel(path),
+        }
+    if as_json:
+        emit(results)
+        return
+    for qid, r in results.items():
+        n = sum(len(ls) for ls in r["leads"].values())
+        typer.echo(
+            f"{qid}: {n} lead(s) in {len(r['leads'])} paper(s); {len(r['unanchored'])} quote(s) in no PDF"
+        )
+        for key, ls in r["leads"].items():
+            pages = sorted({lead["page"] for lead in ls})
+            typer.echo(f"  {key}: {len(ls)} lead(s), p. {', '.join(map(str, pages))}")
+        if r["inconclusive"]:
+            typer.echo(
+                "  the notebook summarised without quotes, twice: readers search every paper"
+            )
+        if r["silent"]:
+            typer.echo(
+                f"  nothing quoted from: {', '.join(r['silent'])} (a verifier confirms)"
+            )
+        typer.echo(f"  answer and leads: {r['file']}")
+    if results:
+        info("readers: `rsx leads KEY` lists a paper's leads")
+    else:
+        info("every question was asked since the last papers were added")
+
+
+@app.command()
+def leads(
+    key: str = typer.Argument(..., help="Paper citekey"),
+    question: str = typer.Option(None, "--question", "-q", help="Only this question"),
+    as_json: bool = JsonOpt,
+    project: Path = ProjectOpt,
+) -> None:
+    """What the notebook quoted from a paper, per question, as the page prints it.
+
+    A lead is a pointer, not evidence: read the page, then copy the text into
+    `obs claim add`. Quotes found in no PDF may be translated or paraphrased
+    passages of this paper; search for them.
+    """
+    p = open_project(project)
+    v = p.vault
+    try:
+        paper = v.get(key, "paper")
+    except VaultError as e:
+        fail(str(e))
+    out = {}
+    for q in plan.search_questions(v):
+        if question and q.id != question:
+            continue
+        rec = notebook.load(p, q.id)
+        if rec is None:
+            continue
+        out[q.id] = {
+            "title": q.title,
+            "asked": rec["asked"],
+            "leads": rec["leads"].get(paper.id, []),
+            "unanchored": rec["unanchored"],
+        }
+    if as_json:
+        emit(out)
+        return
+    if not out:
+        typer.echo(
+            "no notebook answers yet: `rsx ask` (or the project has no notebook)"
+        )
+        return
+    for qid, r in out.items():
+        typer.echo(f"{qid}: {r['title']}  (asked {r['asked']})")
+        if r["leads"]:
+            for lead in r["leads"]:
+                typer.echo(_lead_lines(lead))
+        else:
+            typer.echo("  the notebook quoted nothing from this paper")
+        for u in r["unanchored"]:
+            typer.echo(f'  in no PDF (translated or paraphrased?): "{u}"')
+    typer.echo(
+        f'\nobs claim add -p {paper.id} -s S-… -q "<text of a lead, checked on its page>" -r ROLE --by lit-reader'
+    )
 
 
 @app.command()
@@ -484,6 +877,9 @@ def draft_submit(by: str = ByOpt, project: Path = ProjectOpt) -> None:
 def draft_review(
     ok: bool = typer.Option(False, "--ok", help="The draft holds"),
     block: bool = typer.Option(False, "--block", help="It must be revised"),
+    finding: list[str] = typer.Option(
+        None, "--finding", "-f", help="One finding, `line N: problem -> fix`; repeat"
+    ),
     file: Path = typer.Option(
         None, "--file", help="Findings, one per line, with line numbers"
     ),
@@ -495,7 +891,11 @@ def draft_review(
     if err := refuse_lead("lit-critic", "Reviewing the draft"):
         fail(err)
     p = open_project(project)
-    findings = file.read_text("utf-8") if file else (text or "")
+    if file and not file.exists():
+        fail(f"{file} does not exist; pass findings with --finding instead")
+    findings = "\n".join(
+        [*(finding or []), *([file.read_text("utf-8")] if file else []), text or ""]
+    ).strip()
     try:
         path = review.review_draft(p, _verdict(ok, block), findings, by)
     except review.ReviewError as e:

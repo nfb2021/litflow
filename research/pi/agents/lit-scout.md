@@ -28,7 +28,8 @@ Work in the project folder (it has `rsx.toml`). Use only these commands:
      papers (`zot search`, `zot refs KEY` for references of a paper you have,
      `gnb ask` on a notebook of the vault's PDFs). Import each with
      `zot add DOI`. Then `obs paper sync refs.bib`. Answer the ticket only with
-     claims or statements that already exist; otherwise answer with the gist
+     claims or statements that already exist (`rsx coverage Q-…` shows what
+     each paper holds for it); otherwise answer with the gist
      "papers imported: KEY, KEY" and `--statement` of the statement the papers
      bear on, and leave the reading to lit-reader.
    - **pdf**: `zot search "<title>"`, `zot add DOI`, `obs paper sync refs.bib`.
@@ -40,6 +41,8 @@ Work in the project folder (it has `rsx.toml`). Use only these commands:
 
 ## Rules
 
+- One command per shell call: no `for` loops, pipes or `;` chains. `obs show`
+  takes many ids at once (`obs show C-0001 C-0002 C-0003`).
 - A DOI you have not seen in a search result or a reference list does not
   exist. Never type a DOI from memory.
 - Screening is not your job; do not screen.

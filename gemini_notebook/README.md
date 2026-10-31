@@ -112,6 +112,7 @@ gnb auth reauth      # log in again / switch account
 
 - `--show-browser` - watch the browser instead of running it in the background
 - `--timeout SECONDS` - wait longer for long answers (default 240) or slow source processing (default 300)
+- `gnb ask --json` - print only `{question, notebook, answer}` as JSON, for scripts such as `rsx ask`
 
 `gnb add` lists every new source as `ready` or `failed` and exits with an error if
 any failed (for example a website Google could not import).

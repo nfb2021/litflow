@@ -175,6 +175,9 @@ def test_claim_quote_checked(obs):
     assert out(r) == "C-0001"
     c = json.loads(obs("show", "C-0001", "--json").stdout)["fm"]
     assert c["quote_check"] == "found" and c["page"] == "1"
+    both = json.loads(obs("show", "C-0001", "doe2026gnsst", "--json").stdout)
+    assert [n["id"] for n in both] == ["C-0001", "doe2026gnsst"]
+    assert "=== C-0001" in out(obs("show", "C-0001", "doe2026gnsst"))
     r = obs(
         "claim",
         "add",

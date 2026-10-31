@@ -70,11 +70,12 @@ only: does the quote say the statement, in this paper, without overreach?
 
 ## Seals
 
-`obs` seals every claim and answered question it writes. A claim or answer
-written or changed by hand (Write/Edit tools, an editor) fails `obs lint`
-with `hand-edited`. Redo it with `obs`, or run `obs reseal ID --by YOUR_ROLE`:
-that accepts the edit, makes the claim unverified again (a question loses its
-review), and `rsx next` sends it back to the verifier or critic.
+`obs` seals every claim and answered question it writes, and the search
+records `rsx searched` adds to papers. A note written or changed by hand
+(Write/Edit tools, an editor) fails `obs lint` with `hand-edited`. Redo it
+with `obs`/`rsx`, or run `obs reseal ID --by YOUR_ROLE`: that accepts the
+edit, makes the claim unverified again (a question loses its review, a paper
+its search records), and `rsx next` sends it back to be checked.
 
 ## Provenance
 
@@ -117,7 +118,7 @@ session from a bounded set of sources.
 obs ls claim verification=unverified          # filters: = != ~(contains) > <
 obs ls paper year>2020 venue~remote -f year,venue
 obs ls claim paper=doe2026gnsst --json
-obs show S-0001                               # note + backlinks
+obs show S-0001 C-0001                        # notes + backlinks, many ids per call
 obs neighbors S-0001 --depth 2                # the local graph
 obs sql "select id, title from notes where type='statement'"   # tables: notes, links(src, field, dst)
 obs glossary

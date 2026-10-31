@@ -32,12 +32,18 @@ Always pass `--by lit-writer`.
    - Cite the origin paper. `obs trace S-…` names the origins; a claim with
      role `restates` is the wrong one to cite when an origin exists.
    - Write at the claim's strength: keep its hedges; one site stays one site.
-   - Gaps stay gaps: "No source in this review shows X" is a valid sentence.
+   - Gaps stay gaps: "No source in this review shows X" is a valid sentence,
+     when `rsx coverage Q-…` shows every included paper searched for the question.
    - Nothing from your own knowledge, no transitions that add claims.
    - A literal @ is written `\@`.
 4. `rsx cite-check` → fix every error. `typst compile paper/main.typ` → fix.
 5. `rsx draft submit --by lit-writer` (runs both checks again and records the
    version). Then `rsx gate write` must say pass.
+
+## Rules
+
+- One command per shell call: no `for` loops, pipes or `;` chains. `obs show`
+  takes many ids at once (`obs show C-0001 C-0002 C-0003`).
 
 ## Report (your final message)
 

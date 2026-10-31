@@ -69,8 +69,9 @@ Every step has a typed gate (`rsx gate … --json`), so a child that says
 | grilling | human | the user answered every grilling ticket on the frontier |
 | sync | lead | every refs.bib entry is a paper note (`obs paper sync refs.bib`) |
 | screen | lit-reader | every paper included/excluded with a criterion id |
-| extract / pdf | lit-reader / lit-scout | included papers have PDFs and checked claims, marked `rsx extracted` |
-| verify | lit-verifier | no unverified claims |
+| notebook | human, then lead | the project has a Gemini Notebook (or `none`), it holds every included PDF (`rsx notebook push`), every question was asked since (`rsx ask`) |
+| extract / pdf | lit-reader / lit-scout | included papers have PDFs and checked claims, are searched for every question (`rsx searched`), marked `rsx extracted` |
+| verify | lit-verifier | no unverified claims, every "found nothing" search confirmed by a second search |
 | trace | lit-scout, lit-reader | statements without an origin: cited papers imported and read |
 | answer | by kind | frontier tickets answered with evidence |
 | review | lit-critic | every answer reviewed ok by someone else |
@@ -87,19 +88,36 @@ unreviewed answers.
 |---|---|
 | `rsx extracted KEY --by ROLE [--none --note …]` | a paper is fully read (refused while its quotes fail) |
 | `rsx not-in KEY S-… --note … --by ROLE` | a cited paper was read and does not say the statement |
+| `rsx searched KEY Q-… --found C-… \| --none --note … --by lit-reader` | a paper was searched for a question |
+| `rsx confirm-none KEY Q-… [--dispute] --note … --by lit-verifier` | a second agent checks a "found nothing" |
+| `rsx coverage [Q-…]` | per question, what each included paper holds: claims, confirmed none, unsearched |
+| `rsx notebook push` | add the included PDFs to the project's Gemini Notebook |
+| `rsx ask [Q-…]` | one notebook query per question across all papers; its quotes, looked up in the PDFs, become leads |
+| `rsx leads KEY [-q Q-…]` | what the notebook quoted from a paper, as the page prints it |
 | `rsx unavailable KEY --reason … --by ROLE` | no copy can be found: excluded, chains end there |
 | `rsx relink OLD NEW` | Better BibTeX gave a cited paper another key |
 | `rsx review Q-… --ok\|--block --note … --by ROLE` | critic's verdict on an answer (not on your own) |
 | `rsx cite-check [DOC] [--json]` | every cited paper included with verified claims; every citing paragraph names its `// C-…` claims |
-| `rsx draft submit --by ROLE` / `rsx draft review --ok\|--block --file F --by ROLE` | the draft's review cycle (hash-bound) |
+| `rsx draft submit --by ROLE` / `rsx draft review --ok\|--block --finding "line N: …" … --by ROLE` | the draft's review cycle (hash-bound) |
 | `rsx doctor`, `rsx pi install` | setup |
 
 The vault itself is the `obsidian` skill (`obs`); papers come in with the
 `zotero` skill (`zot`); `gnb` queries a Gemini Notebook of the PDFs; the draft
 is Typst (`typst` skill).
 
+**The notebook finds, the PDF judges.** The project's Gemini Notebook holds
+every included PDF and is good at searching many at once, so `rsx ask` asks
+it each question once and makes it quote. Every quote is looked up in the
+local PDF of every included paper: found, it becomes a lead with page and the
+page's own words (`rsx leads KEY`); a paper it quotes nothing from is recorded
+as "nothing found" by `notebook`, which a verifier confirms by searching the
+PDF itself. The notebook's answer is never evidence: claims quote the PDF,
+and the verifier checks them there.
+
 ## Rules for the lead
 
+- `rsx notebook use` is the user's decision (a notebook, or `none`): ask the
+  user, never run it yourself.
 - Do not skip a stage, edit the vault by hand, or mark work done that a gate
   blocks. If a gate seems wrong, tell the user; do not work around it.
 - Keep agents apart: the verifier never extracts what it verifies, the critic

@@ -735,10 +735,10 @@ def reseal(
     by: str = typer.Option(..., "--by", help="Who accepts the hand edit"),
     vault: Path = VaultOpt,
 ) -> None:
-    """Accept a hand-edited claim or question, and send it back to be checked.
+    """Accept a hand-edited claim, question or paper, and send it back to be checked.
 
     A claim loses its verification and has its quote looked up again; a
-    question loses its review.
+    question loses its review; a paper loses its search records.
     """
     v = open_vault(vault)
     try:
@@ -746,20 +746,22 @@ def reseal(
     except VaultError as e:
         fail(str(e))
     if n.type not in SEALED:
-        fail(f"{n.id} is a {n.type}; only claims and questions are sealed")
+        fail(f"{n.id} is a {n.type}; only claims, questions and papers are sealed")
     if n.type == "claim":
         if n.fm.get("verification") != "unverified":
             n.fm["verification"] = "unverified"
             for f in ("verified_by", "verify_note", "verified"):
                 n.fm.pop(f, None)
         _apply_check(v, n, _check_claim(v, n))
+    elif n.type == "paper":
+        n.fm.pop("searched", None)
     else:
         for f in ("review", "reviewed_by", "reviewed", "review_of"):
             n.fm.pop(f, None)
     n.fm["resealed_by"] = by
     n.fm["resealed"] = today()
     v.save(n)
-    again = "verified" if n.type == "claim" else "reviewed"
+    again = {"claim": "verified", "paper": "searched"}.get(n.type, "reviewed")
     typer.echo(f"{n.id}: resealed; it must be {again} again")
 
 
@@ -1138,16 +1140,21 @@ def ls(
 
 
 @app.command()
-def show(note_id: str, vault: Path = VaultOpt, as_json: bool = JsonOpt) -> None:
-    """A note with its frontmatter, body and backlinks."""
+def show(
+    note_ids: list[str] = typer.Argument(..., metavar="NOTE_ID..."),
+    vault: Path = VaultOpt,
+    as_json: bool = JsonOpt,
+) -> None:
+    """Notes with their frontmatter, body and backlinks; several ids in one call."""
     v = open_vault(vault)
     try:
-        n = v.get(note_id)
+        notes = [v.get(i) for i in note_ids]
     except VaultError as e:
         fail(str(e))
-    back = [(b.id, b.type, f) for b, f in v.backlinks(n.id)]
-    if as_json:
-        emit(
+    shown = []
+    for n in notes:
+        back = [(b.id, b.type, f) for b, f in v.backlinks(n.id)]
+        shown.append(
             {
                 "id": n.id,
                 "type": n.type,
@@ -1157,12 +1164,17 @@ def show(note_id: str, vault: Path = VaultOpt, as_json: bool = JsonOpt) -> None:
                 "backlinks": [{"id": i, "type": t, "field": f} for i, t, f in back],
             }
         )
+    if as_json:
+        emit(shown[0] if len(shown) == 1 else shown)
         return
-    typer.echo(n.path.read_text(encoding="utf-8"))
-    if back:
-        typer.echo("backlinks:")
-        for i, t, f in back:
-            typer.echo(f"  {i} ({t}, via {f})")
+    for n, d in zip(notes, shown, strict=True):
+        if len(notes) > 1:
+            typer.echo(f"=== {n.id}")
+        typer.echo(n.path.read_text(encoding="utf-8"))
+        if d["backlinks"]:
+            typer.echo("backlinks:")
+            for b in d["backlinks"]:
+                typer.echo(f"  {b['id']} ({b['type']}, via {b['field']})")
 
 
 @app.command()
