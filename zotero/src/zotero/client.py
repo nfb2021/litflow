@@ -104,12 +104,12 @@ class ZoteroMCP:
     def tools(self) -> list[str]:
         return [t["name"] for t in (self._rpc("tools/list") or {}).get("tools", [])]
 
-    def call(self, name: str, **args) -> Any:
+    def call(self, tool: str, /, **args) -> Any:
         """Call a tool; returns its JSON payload (or plain text)"""
         if not self.session_id:
             self.connect()
         args = {k: v for k, v in args.items() if v is not None}
-        result = self._rpc("tools/call", {"name": name, "arguments": args}) or {}
+        result = self._rpc("tools/call", {"name": tool, "arguments": args}) or {}
         text = "\n".join(
             c.get("text", "")
             for c in result.get("content", [])
