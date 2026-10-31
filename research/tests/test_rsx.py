@@ -1093,3 +1093,40 @@ def test_manual_fetch_lists_the_dois_for_the_user(lf, tmp_path, monkeypatch):
     assert (
         nxt(lf)["stage"] == "snowball" and nxt(lf)["role"] == "human"
     )  # refs.bib export
+
+
+def test_typographic_hyphens_name_the_same_doi(lf):
+    assert (
+        snowball.norm("https://doi.org/10.1029/2023GL107121") == "10.1029/2023gl107121"
+    )
+    assert snowball.norm("10.5194/bg\u201020\u20101789") == "10.5194/bg-20-1789"
+    p = proj.load(lf.root)
+    snowball.state_path(p).write_text(
+        json.dumps(
+            {
+                "seeds": ["10.9999/a"],
+                "papers": {
+                    "10.9999/b-1": {
+                        "depth": 1,
+                        "found_in": ["10.9999/a"],
+                        "zotero": "K",
+                    },
+                    "10.9999/c": {
+                        "depth": 1,
+                        "found_in": ["10.9999/a"],
+                        "refs": {"list": [{"n": 1, "doi": "10.9999/b\u20101"}]},
+                    },
+                    # written before norm() knew the hyphen
+                    "10.9999/b\u20101": {"depth": 2, "found_in": ["10.9999/c"]},
+                },
+            }
+        )
+    )
+    s = snowball.load(p)
+    assert sorted(s["papers"]) == ["10.9999/b-1", "10.9999/c"]
+    assert s["papers"]["10.9999/b-1"] == {
+        "depth": 1,
+        "found_in": ["10.9999/a", "10.9999/c"],
+        "zotero": "K",
+    }
+    assert s["papers"]["10.9999/c"]["refs"]["list"][0]["doi"] == "10.9999/b-1"
