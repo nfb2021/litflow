@@ -295,10 +295,15 @@ def s_snowball(x: Ctx) -> list[Action]:
                 "snowball",
                 "lead",
                 f"Fetch {len(w['fetch'])} paper(s) into Zotero",
-                "Zotero fetches PDFs the institution licenses only from its network.",
+                "Zotero fetches open-access PDFs anywhere, licensed ones only from the "
+                "institution's network.",
                 items=w["fetch"],
                 commands=[
-                    "# ask the user to connect to the institution's network or VPN; wait for their yes",
+                    (
+                        "# ask the user whether they are on the institution's network or VPN; "
+                        "without one, Zotero gets the metadata and open-access PDFs, and the "
+                        "user adds the others afterwards (`rsx snowball sync` lists them)"
+                    ),
                     "rsx snowball fetch       # zot add into the collection, then reads what arrived",
                     "# a paper that cannot be found: rsx snowball unavailable DOI --reason '…'",
                 ],
@@ -319,6 +324,21 @@ def s_snowball(x: Ctx) -> list[Action]:
                         f"Better BibTeX, tick 'Keep updated', save as {x.bib_rel} (once per project)"
                     ),
                     "rsx gate snowball",
+                ],
+                gate="rsx gate snowball",
+            )
+        ]
+    if w["vault"]:
+        return [
+            Action(
+                "snowball",
+                "lead",
+                f"Add {len(w['vault'])} snowball paper(s) to the vault",
+                "The vault and the notebook take included paper notes only; the "
+                "snowball's reader and verifier have decided already.",
+                items=w["vault"],
+                commands=[
+                    "rsx snowball sync   # creates and screens their paper notes"
                 ],
                 gate="rsx gate snowball",
             )

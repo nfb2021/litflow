@@ -948,6 +948,16 @@ def test_snowball_follows_references_n_levels_and_never_twice(
         )
     )
     bib("10.9999/a")
+    # the export has it: the seed gets a paper note, screened in by the user's choice
+    a = nxt(lf)
+    assert (a["role"], a["items"]) == ("lead", ["10.9999/a"]) and "vault" in a["title"]
+    lf.rsx("notebook", "use", "https://notebook.google.com/notebook/x")
+    lf.rsx("notebook", "push", ok=False)  # nothing included yet: says so
+    r = lf.rsx("snowball", "sync")
+    assert "1 paper note(s) screened in" in r.output
+    k0 = (root / "vault" / "papers" / "k0.md").read_text()
+    assert "screening: included" in k0 and "screened_by: human" in k0
+    check.record(proj.load(root), [])  # a new notebook choice re-arms the check
     a = nxt(lf)
     assert (a["stage"], a["role"], a["items"]) == (
         "snowball",
@@ -1011,6 +1021,10 @@ def test_snowball_follows_references_n_levels_and_never_twice(
 
     lf.rsx("snowball", "fetch")
     bib("10.9999/a", "10.9999/b", "10.9999/c")
+    lf.rsx("snowball", "sync")
+    assert (
+        "screened_by: lit-verifier" in (root / "vault" / "papers" / "k1.md").read_text()
+    )
     a = nxt(lf)
     assert a["role"] == "lit-reader" and sorted(a["items"]) == [
         "10.9999/b",
@@ -1020,6 +1034,7 @@ def test_snowball_follows_references_n_levels_and_never_twice(
     lf.rsx("snowball", "confirm", "10.9999/b", "--by", "lit-verifier")
     lf.rsx("snowball", "fetch")
     bib("10.9999/a", "10.9999/b", "10.9999/c", "10.9999/e")
+    lf.rsx("snowball", "sync")
 
     # level 2 (E) is fetched but not expanded; A came back through B and was not
     # fetched again; C has no reference list at all

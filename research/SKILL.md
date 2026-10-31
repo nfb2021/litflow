@@ -27,8 +27,10 @@ answer. Never pick a value yourself, not even an obvious one:
 - the Gemini Notebook (`rsx notebook use URL|none`; they create an empty one),
 - how many levels of references the snowball follows (`rsx config depth N`, 0 = none),
 - how papers get into Zotero (`rsx config fetch zotero|manual`): Zotero fetches
-  them, with the user on the institution's network or VPN, or the user adds
-  them by hand from the DOI links litflow gives,
+  them (open-access PDFs anywhere, licensed ones on the institution's network
+  or VPN; without one the user logs in on the publisher page with "Access
+  through your institution" and saves the PDF with the Zotero Connector), or
+  the user adds them by hand from the DOI links litflow gives,
 - the seed papers, when depth > 0 (`rsx snowball seed DOI ...`).
 
 Then `rsx check`, the startup check: tools, Zotero with write access, Better
@@ -142,8 +144,9 @@ and the verifier checks them there.
 
 - The setup choices (collection, notebook, depth, fetch, seeds) and the
   protocol are the user's decisions: ask the user, never pick or run them
-  yourself. Before Zotero fetches papers (fetch = zotero), ask the user to
-  connect to the institution's network or VPN and wait for their yes.
+  yourself. Before Zotero fetches papers (fetch = zotero), ask the user
+  whether they are on the institution's network or VPN; without one, fetch
+  anyway and give them the papers still without a PDF afterwards.
 - Do not skip a stage, edit the vault by hand, or mark work done that a gate
   blocks. If a gate seems wrong, tell the user; do not work around it.
 - Keep agents apart: the verifier never extracts what it verifies, the critic
