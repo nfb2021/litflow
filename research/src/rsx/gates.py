@@ -17,7 +17,9 @@ from rsx.plan import Ctx
 
 GATES = (
     "vault",
+    "setup",
     "protocol",
+    "snowball",
     "map",
     "grilling",
     "sync",
@@ -80,6 +82,10 @@ def gate(
         extra["next"] = nxt.to_dict()
         if nxt.stage != "done":
             issues.append(f"not done: next is {nxt.stage} ({nxt.title})")
+    elif stage == "setup":
+        issues += _from_actions(plan.s_setup(x), None)
+    elif stage == "snowball":
+        issues += _from_actions(plan.s_snowball(x), paper)
     elif stage == "protocol":
         issues += _from_actions(plan.s_protocol(x), None)
     elif stage == "map":

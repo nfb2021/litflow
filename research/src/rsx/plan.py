@@ -19,7 +19,7 @@ from dataclasses import asdict, dataclass, field
 from obs import bib, lint, provenance, wayfinder
 from obs.vault import Vault, get_section
 
-from rsx import notebook, review
+from rsx import check, notebook, review, snowball
 from rsx.project import Project
 
 ROLES = (
@@ -231,6 +231,133 @@ def s_fix(x: Ctx) -> list[Action]:
         )
         for role, errs in by_role.items()
     ]
+
+
+def s_setup(x: Ctx) -> list[Action]:
+    p = x.project
+    missing = [i for i in check.choices(p) if not i["ok"]]
+    if missing:
+        return [
+            Action(
+                "setup",
+                "human",
+                "Ask the user for the project's choices",
+                "Only the user decides these; agents ask, they never pick. "
+                "Ask one question at a time, record the answer, then the next.",
+                items=[i["item"] for i in missing],
+                commands=[f"# {i['fix']}" for i in missing] + ["rsx check"],
+                gate="rsx gate setup",
+            )
+        ]
+    if not check.passed(p):
+        return [
+            Action(
+                "setup",
+                "lead",
+                "Run the startup check",
+                "Tools, Zotero, Better BibTeX, the Google login and the refs.bib export "
+                "must work before anything starts. What fails, the user fixes.",
+                commands=[
+                    "rsx check        # tell the user each failed item and its fix",
+                    "rsx check        # again, once the user has fixed them",
+                ],
+                gate="rsx gate setup",
+            )
+        ]
+    return []
+
+
+def s_snowball(x: Ctx) -> list[Action]:
+    p = x.project
+    if not snowball.depth_of(p):
+        return []
+    w = snowball.open_work(p)
+    if w["fetch"]:
+        if p.fetch == "manual":
+            return [
+                Action(
+                    "snowball",
+                    "human",
+                    f"Add {len(w['fetch'])} paper(s) to Zotero by hand",
+                    "The user chose to add papers themselves (fetch = manual).",
+                    items=w["fetch"],
+                    commands=[
+                        "rsx snowball fetch       # writes the doi.org links to .rsx/to-add.txt",
+                        f"# give the user the links; they add each paper to the Zotero collection '{p.collection}' (Zotero Connector), with its PDF",
+                        "rsx snowball sync        # once the user says they are in",
+                        "# a paper the user cannot get: rsx snowball unavailable DOI --reason '…'",
+                    ],
+                    gate="rsx gate snowball",
+                )
+            ]
+        return [
+            Action(
+                "snowball",
+                "lead",
+                f"Fetch {len(w['fetch'])} paper(s) into Zotero",
+                "Zotero fetches PDFs the institution licenses only from its network.",
+                items=w["fetch"],
+                commands=[
+                    "# ask the user to connect to the institution's network or VPN; wait for their yes",
+                    "rsx snowball fetch       # zot add into the collection, then reads what arrived",
+                    "# a paper that cannot be found: rsx snowball unavailable DOI --reason '…'",
+                ],
+                gate="rsx gate snowball",
+            )
+        ]
+    if w["bib"]:
+        return [
+            Action(
+                "snowball",
+                "human",
+                f"Better BibTeX has not exported {len(w['bib'])} paper(s) to refs.bib",
+                "The vault learns about papers from refs.bib only.",
+                items=w["bib"],
+                commands=[
+                    f"# the user: in Zotero right-click '{p.collection}' > Export Collection > "
+                    f"Better BibTeX, tick 'Keep updated', save as {x.bib_rel} (once per project)",
+                    "rsx gate snowball",
+                ],
+                gate="rsx gate snowball",
+            )
+        ]
+    out = []
+    if w["judge"]:
+        out.append(
+            Action(
+                "snowball",
+                "lit-reader",
+                f"Judge the references of {len(w['judge'])} paper(s) against the protocol",
+                "Every reference gets a decision: include (in scope) or exclude with a "
+                "criterion from protocol.md. One reader per paper.",
+                items=w["judge"],
+                commands=[
+                    "rsx snowball refs KEY",
+                    "rsx snowball judge KEY --include N --include N=10.… --exclude N:'E2: why' "
+                    "--exclude-rest 'E2: why' --by lit-reader",
+                    "# a reference without a DOI: rsx snowball find 'title', then N=10.… (or N=none)",
+                    "# no reference list at all: rsx snowball no-refs KEY --reason '…' --by lit-reader",
+                ],
+                gate="rsx gate snowball",
+            )
+        )
+    if w["confirm"]:
+        out.append(
+            Action(
+                "snowball",
+                "lit-verifier",
+                f"Check the reference judgements of {len(w['confirm'])} paper(s)",
+                "A different agent than the reader checks every decision; only confirmed "
+                "inclusions enter the snowball.",
+                items=w["confirm"],
+                commands=[
+                    "rsx snowball refs KEY     # the reader's decisions",
+                    "rsx snowball confirm KEY --by lit-verifier [--include N] [--exclude N:'E2: why']",
+                ],
+                gate="rsx gate snowball",
+            )
+        )
+    return out
 
 
 def s_protocol(x: Ctx) -> list[Action]:
@@ -757,7 +884,9 @@ def s_draft_review(x: Ctx) -> list[Action]:
 # stage order = the method; `rsx next` returns the first stage with work
 STAGES = [
     ("fix", s_fix),
+    ("setup", s_setup),
     ("protocol", s_protocol),
+    ("snowball", s_snowball),
     ("map", s_map),
     ("grilling", s_grilling),
     ("sync", s_sync),

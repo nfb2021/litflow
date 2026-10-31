@@ -85,10 +85,14 @@ Every write names its author (`--by lit-reader`), and a guard stops the lead fro
 as another role. A gate that blocks names what is missing, so the next step comes from the
 tool and not from the model's memory.
 
-## 3. The method: sixteen stages, earliest unfinished first
+## 3. The method: eighteen stages, earliest unfinished first
 
 The stage order is the method. `rsx next` goes through it from left to right and stops at
-the first stage that still has work. When a new paper or a new question arrives, the
+the first stage that still has work. It starts with **setup**: you choose the Zotero
+collection, the Gemini Notebook, how deep the snowball goes and whether Zotero fetches the
+papers or you add them; then `rsx check` must pass. The **snowball** follows the seeds'
+references level by level: a reader judges every reference against the protocol, a verifier
+confirms, and no DOI is fetched twice. When a new paper or a new question arrives, the
 earlier stages have work again, so they come first. `fix` comes before every stage: if
 `obs lint` finds an error (a quote not on its page, a broken link), nothing else runs until
 it is fixed.
@@ -99,7 +103,15 @@ flowchart LR
 
     subgraph setup [Set up]
         direction TB
-        protocol["protocol<br/>criteria I1, E2 …"] --> map["map<br/>question tickets"] --> grilling["grilling<br/>only you answer"]
+        setupst["setup<br/>your choices + rsx check"] --> protocol["protocol<br/>criteria I1, E2 …"]
+    end
+    subgraph snow [Snowball]
+        direction TB
+        snowball["snowball<br/>references, N levels,<br/>judged + confirmed"]
+    end
+    subgraph ask [Ask]
+        direction TB
+        map["map<br/>question tickets"] --> grilling["grilling<br/>only you answer"]
     end
     subgraph collect [Collect]
         direction TB
@@ -122,7 +134,7 @@ flowchart LR
         draft["write<br/>draft + cite-check"] --> draftreview["draft-review<br/>every sentence"]
     end
 
-    fix --> setup --> collect --> find --> check --> answerp --> write
+    fix --> setup --> snow --> ask --> collect --> find --> check --> answerp --> write
 
     classDef human fill:#fbe3d6,stroke:#c2410c,color:#18232b
     classDef lead fill:#e6eaed,stroke:#52606b,color:#18232b
@@ -131,10 +143,10 @@ flowchart LR
     classDef verifier fill:#dcf1e3,stroke:#15803d,color:#18232b
     classDef critic fill:#f8dddd,stroke:#b91c1c,color:#18232b
     classDef writer fill:#ebe2fd,stroke:#7c3aed,color:#18232b
-    class protocol,grilling human
+    class setupst,protocol,grilling human
     class fix,map,sync,notebook,stuck lead
     class pdf,trace scout
-    class screen,extract,answer reader
+    class snowball,screen,extract,answer reader
     class verify verifier
     class review,draftreview critic
     class draft writer
@@ -295,3 +307,49 @@ flowchart LR
 
 The draft can then cite the origin, or say which papers restate it. A chain that ends at a
 paper which doesn't support the statement is caught here and not left in the draft.
+
+## 8. Setup and the snowball
+
+Before anything runs, you make the choices only you can make, and the startup check
+confirms that every tool and service works. The snowball then follows references from
+your seed papers, one level at a time, up to the depth you chose.
+
+```mermaid
+flowchart TB
+    subgraph you [You decide, at setup]
+        direction LR
+        c1["Zotero collection"] ~~~ c2["Gemini Notebook"] ~~~ c3["depth N"] ~~~ c4["fetch: zotero or manual"] ~~~ c5["seed DOIs"]
+    end
+    check{"rsx check<br/>tools · Zotero write access · Better BibTeX<br/>Google login · refs.bib export · PDFs"}
+    you --> check
+    check -- "fails: you fix it" --> check
+
+    subgraph level [One level of the snowball]
+        direction TB
+        fetch["Get the papers into Zotero<br/>zotero: zot add, you on the institution's VPN<br/>manual: you add them from the DOI links"]
+        sync["rsx snowball sync<br/>which arrived, which lack a PDF"]
+        refs["Reader: rsx snowball refs<br/>every reference numbered"]
+        judge["Reader: rsx snowball judge<br/>include, or exclude with an E-criterion"]
+        confirm["Verifier: rsx snowball confirm<br/>a different agent checks every decision"]
+        fetch --> sync --> refs --> judge --> confirm
+    end
+    check -- pass --> fetch
+    confirm -- "new DOIs, level + 1 ≤ N" --> fetch
+    confirm -- "DOI already in the snowball" --> edge["link only:<br/>never fetched twice"]
+    confirm -- "level N reached" --> stop["fetched, not expanded"]
+    sync -.-> book[("vault/snowball.md<br/>who cites whom, exclusions,<br/>references without a DOI")]
+
+    classDef human fill:#fbe3d6,stroke:#c2410c,color:#18232b
+    classDef reader fill:#dde8fd,stroke:#2563eb,color:#18232b
+    classDef verifier fill:#dcf1e3,stroke:#15803d,color:#18232b
+    classDef hub fill:#e3ebf7,stroke:#2f5da8,stroke-width:2px,color:#18232b
+    class c1,c2,c3,c4,c5 human
+    class refs,judge reader
+    class confirm verifier
+    class check hub
+```
+
+A citation cycle (B cites A, which cited B) adds a link in the log book but no new paper.
+A reference without a DOI is looked up on Crossref (`rsx snowball find`) or logged without
+being imported. A paper nobody can get is marked `rsx snowball unavailable`, and its
+references can still be judged from Crossref.

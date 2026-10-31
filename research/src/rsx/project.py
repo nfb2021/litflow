@@ -21,7 +21,17 @@ from obs.vault import MARKER as VAULT_MARKER
 from obs.vault import Vault
 
 MARKER = "rsx.toml"
-KEYS = ("title", "vault", "bib", "doc", "reviews", "notebook")
+KEYS = (
+    "title",
+    "vault",
+    "bib",
+    "doc",
+    "reviews",
+    "notebook",
+    "collection",
+    "depth",
+    "fetch",
+)
 DEFAULTS = {
     "title": "Literature research",
     "vault": "vault",
@@ -31,6 +41,13 @@ DEFAULTS = {
     # Gemini Notebook holding the included PDFs: gnb library ID or URL;
     # "none" = work from the local PDFs only; "" = not decided yet
     "notebook": "",
+    # the choices the user makes at setup ("" = not asked yet): the Zotero
+    # collection, how many levels of references the snowball follows from the
+    # seeds (0 = no snowball), and how papers get into Zotero: "zotero" (zot add
+    # fetches them, on the institution's network) or "manual" (the user adds them)
+    "collection": "",
+    "depth": "",
+    "fetch": "",
 }
 
 DOC_TEMPLATE = """// Draft for {title}. Written by lit-writer, reviewed by lit-critic.
@@ -66,6 +83,9 @@ class Project:
     doc: Path
     reviews: Path
     notebook: str = ""
+    collection: str = ""
+    depth: str = ""
+    fetch: str = ""
 
     @property
     def vault(self) -> Vault:
@@ -110,6 +130,9 @@ def load(root: Path) -> Project:
         doc=(root / cfg["doc"]).resolve(),
         reviews=(root / cfg["reviews"]).resolve(),
         notebook=cfg["notebook"],
+        collection=cfg["collection"],
+        depth=cfg["depth"],
+        fetch=cfg["fetch"],
     )
 
 

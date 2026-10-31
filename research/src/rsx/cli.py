@@ -48,6 +48,11 @@ notebook_app = typer.Typer(
 app.add_typer(draft_app, name="draft")
 app.add_typer(notebook_app, name="notebook")
 app.add_typer(pi_app, name="pi")
+snowball_app = typer.Typer(
+    help="Citation snowball: seeds -> references, N levels deep, judged and confirmed.",
+    no_args_is_help=True,
+)
+app.add_typer(snowball_app, name="snowball")
 
 ProjectOpt = typer.Option(
     None,
@@ -1084,3 +1089,283 @@ def doctor() -> None:
     )
     if bad:
         raise typer.Exit(1)
+
+
+# --- setup and the snowball ---------------------------------------------------
+
+CONFIG = {
+    "collection": "Zotero collection name (a new name is created on the first fetch)",
+    "depth": "levels of references the snowball follows from the seeds (0 = no snowball)",
+    "fetch": "zotero (zot add fetches, on the institution's network) or manual (the user adds)",
+}
+
+
+@app.command("config")
+def config_cmd(
+    key: str = typer.Argument(..., help=f"One of: {', '.join(CONFIG)}"),
+    value: str = typer.Argument(None, help="New value; omit to show the current one"),
+    project: Path = ProjectOpt,
+) -> None:
+    """Record a choice the user made: collection, depth or fetch. Agents ask; never pick."""
+    p = open_project(project)
+    if key not in CONFIG:
+        fail(
+            f"unknown key {key!r}: {', '.join(f'{k} ({v})' for k, v in CONFIG.items())}"
+        )
+    if value is None:
+        typer.echo(getattr(p, key) or "(not chosen)")
+        return
+    value = value.strip()
+    if key == "depth" and not value.isdigit():
+        fail(
+            "depth is a whole number: 0 (no snowball), 1 (the seeds' references), 2, ..."
+        )
+    if key == "fetch" and value not in ("zotero", "manual"):
+        fail("fetch is 'zotero' or 'manual'")
+    if not value:
+        fail(f"{key} cannot be empty")
+    p = proj.set_key(p, key, value)
+    typer.echo(f"{key}: {getattr(p, key)}")
+
+
+@app.command("check")
+def check_cmd(as_json: bool = JsonOpt, project: Path = ProjectOpt) -> None:
+    """The startup check: tools, services, the user's choices, the refs.bib export.
+    Exit 1 while an error remains; the workflow waits for a passing check."""
+    from rsx import check
+
+    p = open_project(project)
+    items = check.run(p)
+    rec = check.record(p, items)
+    if as_json:
+        emit({**rec, "items": items})
+    else:
+        group = None
+        for i in items:
+            if i["group"] != group:
+                group = i["group"]
+                typer.echo(f"{group}:")
+            mark = "ok  " if i["ok"] else ("FAIL" if i["level"] == "error" else "warn")
+            typer.echo(
+                f"  {mark} {i['item']}" + ("" if i["ok"] else f"  -> {i['fix']}")
+            )
+        typer.echo("startup check passed" if rec["ok"] else "startup check FAILED")
+    if not rec["ok"]:
+        raise typer.Exit(1)
+
+
+def _snow(fn, *args):
+    from rsx import snowball
+
+    try:
+        return fn(*args)
+    except snowball.SnowballError as e:
+        fail(str(e))
+
+
+@snowball_app.command("seed")
+def snowball_seed(
+    dois: list[str] = typer.Argument(..., help="DOIs of the seed papers the user gave"),
+    project: Path = ProjectOpt,
+) -> None:
+    """Record the seed papers (level 0). The user names them."""
+    from rsx import snowball
+
+    added = _snow(snowball.seed, open_project(project), dois)
+    typer.echo(
+        f"{len(added)} seed(s) added" + (f": {', '.join(added)}" if added else "")
+    )
+
+
+@snowball_app.command("fetch")
+def snowball_fetch(as_json: bool = JsonOpt, project: Path = ProjectOpt) -> None:
+    """Get the papers not in Zotero yet: zot add (fetch = zotero) or a list of
+    doi.org links for the user (fetch = manual)."""
+    from rsx import snowball
+
+    p = open_project(project)
+    r = _snow(snowball.fetch, p)
+    if as_json:
+        emit(r)
+        return
+    if not r["todo"]:
+        typer.echo("every snowball paper is in Zotero")
+    elif r["mode"] == "manual":
+        typer.echo(
+            f"{len(r['todo'])} paper(s) for the user to add to '{p.collection}':"
+        )
+        for d in r["todo"]:
+            typer.echo(f"  https://doi.org/{d}")
+        info("listed in .rsx/to-add.txt; then `rsx snowball sync`")
+    else:
+        for res in r["results"]:
+            typer.echo(f"  {res.get('status', '?'):9} {res.get('input')}")
+        _snowball_summary(p)
+
+
+@snowball_app.command("sync")
+def snowball_sync(project: Path = ProjectOpt) -> None:
+    """Read the Zotero collection: which snowball papers arrived, which lack a PDF."""
+    from rsx import snowball
+
+    p = open_project(project)
+    r = _snow(snowball.sync, p)
+    typer.echo(
+        f"{len(r['arrived'])} paper(s) arrived; {len(r['missing'])} still to add"
+    )
+    for d in r["missing"]:
+        typer.echo(f"  missing  https://doi.org/{d}")
+    for d in r["no_pdf"]:
+        typer.echo(f"  no PDF   https://doi.org/{d}")
+
+
+@snowball_app.command("unavailable")
+def snowball_unavailable(
+    doi: str = typer.Argument(...),
+    reason: str = typer.Option(..., "--reason", help="Why no copy can be had"),
+    project: Path = ProjectOpt,
+) -> None:
+    """A paper nobody can get: never fetched again (its references can still be judged)."""
+    from rsx import snowball
+
+    _snow(snowball.unavailable, open_project(project), doi, reason)
+    typer.echo(f"{doi}: unavailable")
+
+
+@snowball_app.command("refs")
+def snowball_refs(
+    doi: str = typer.Argument(..., help="A snowball paper's DOI"),
+    as_json: bool = JsonOpt,
+    project: Path = ProjectOpt,
+) -> None:
+    """A paper's references, numbered, with the reader's decisions if judged."""
+    from rsx import snowball
+
+    p = open_project(project)
+    s = snowball.load(p)
+    d = snowball.norm(doi)
+    x = s["papers"].get(d)
+    if x is None:
+        fail(f"{doi} is not in the snowball: `rsx next` names the papers to judge")
+    if x.get("refs"):
+        source, rows = x["refs"]["source"], x["refs"]["list"]
+    else:
+        source, rows = _snow(snowball.references, p, d)
+    if as_json:
+        emit({"doi": d, "source": source, "refs": rows, "judgement": x.get("refs")})
+        return
+    typer.echo(f"{d}  level {x['depth']}  {len(rows)} references ({source})")
+    for r in rows:
+        seen = "in snowball" if r.get("doi") in s["papers"] else ""
+        dec = r.get("decision", "")
+        why = f" ({r['why']})" if r.get("why") else ""
+        typer.echo(
+            f"  {r['n']:3} {dec:8}{why} {r.get('doi') or 'no DOI':38} {seen:11} {r['text'][:150]}"
+        )
+    if not rows:
+        info(
+            "no reference list in Crossref or the PDF: `rsx snowball no-refs` with the reason"
+        )
+
+
+@snowball_app.command("judge")
+def snowball_judge(
+    doi: str = typer.Argument(...),
+    include: list[str] = typer.Option(
+        None, "--include", "-i", help="N, or N=DOI when the list has none, or N=none"
+    ),
+    exclude: list[str] = typer.Option(None, "--exclude", "-x", help="N:'E2: why'"),
+    rest: str = typer.Option(
+        None, "--exclude-rest", help="'E2: why' for every reference not named"
+    ),
+    by: str = ByOpt,
+    project: Path = ProjectOpt,
+) -> None:
+    """Decide every reference of a paper against protocol.md."""
+    from rsx import snowball
+
+    r = _snow(snowball.judge, open_project(project), doi, include, exclude, rest, by)
+    inc = sum(x.get("decision") == "include" for x in r["list"])
+    typer.echo(
+        f"{doi}: {inc} included, {len(r['list']) - inc} excluded; a verifier confirms next"
+    )
+
+
+@snowball_app.command("no-refs")
+def snowball_no_refs(
+    doi: str = typer.Argument(...),
+    reason: str = typer.Option(..., "--reason"),
+    by: str = ByOpt,
+    project: Path = ProjectOpt,
+) -> None:
+    """Record that no reference list can be had (not in Crossref, no PDF)."""
+    from rsx import snowball
+
+    _snow(snowball.no_refs, open_project(project), doi, reason, by)
+    typer.echo(f"{doi}: no references recorded")
+
+
+@snowball_app.command("confirm")
+def snowball_confirm(
+    doi: str = typer.Argument(...),
+    include: list[str] = typer.Option(
+        None, "--include", "-i", help="Include what the reader excluded: N or N=DOI"
+    ),
+    exclude: list[str] = typer.Option(
+        None, "--exclude", "-x", help="Exclude what the reader included: N:'E2: why'"
+    ),
+    by: str = ByOpt,
+    project: Path = ProjectOpt,
+) -> None:
+    """The verifier's check of a reader's judgement. Inclusions then enter the snowball."""
+    from rsx import snowball
+
+    added = _snow(snowball.confirm, open_project(project), doi, by, include, exclude)
+    typer.echo(f"{doi}: confirmed; {len(added)} new paper(s) for the next level")
+
+
+@snowball_app.command("find")
+def snowball_find(
+    title: str = typer.Argument(..., help="The reference's text"),
+    project: Path = ProjectOpt,
+) -> None:
+    """Crossref's best matches for a reference without a DOI."""
+    from rsx import snowball
+
+    for line in _snow(snowball.find, open_project(project), title):
+        typer.echo(line)
+
+
+def _snowball_summary(p) -> None:
+    from rsx import snowball
+
+    s = snowball.load(p)
+    w = snowball.open_work(p)
+    levels: dict[int, int] = {}
+    for x in s["papers"].values():
+        levels[x["depth"]] = levels.get(x["depth"], 0) + 1
+    typer.echo(
+        f"depth {p.depth or '?'}; papers per level: "
+        + ", ".join(f"{k}: {v}" for k, v in sorted(levels.items()))
+    )
+    typer.echo(
+        f"to fetch {len(w['fetch'])}, to judge {len(w['judge'])}, to confirm {len(w['confirm'])}, "
+        f"not in refs.bib {len(w['bib'])}, without PDF {len(w['no_pdf'])}"
+    )
+    typer.echo(f"log book: {p.rel(p.vault_dir / 'snowball.md')}")
+
+
+@snowball_app.command("status")
+def snowball_status(project: Path = ProjectOpt) -> None:
+    """Papers per level and the open snowball work."""
+    _snowball_summary(open_project(project))
+
+
+@snowball_app.command("log")
+def snowball_log(project: Path = ProjectOpt) -> None:
+    """Rewrite the log book (vault/snowball.md) and the papers' snowball_cites links."""
+    from rsx import snowball
+
+    p = open_project(project)
+    snowball.render(p, snowball.load(p))
+    typer.echo(p.rel(p.vault_dir / "snowball.md"))

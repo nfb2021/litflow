@@ -44,6 +44,42 @@ vod-review/
 In Zotero, export the project's collection with Better BibLaTeX to `refs.bib` and tick
 *Keep updated*. `obs` run anywhere in the project uses `vault/`.
 
+### Setup: your choices and the startup check
+
+The first step asks you what only you decide; agents ask, they never pick:
+
+| Setting | Command | Meaning |
+|---|---|---|
+| collection | `rsx config collection "NAME"` | the Zotero collection of this project |
+| notebook | `rsx notebook use URL\|none` | an empty Gemini Notebook you created, or none |
+| depth | `rsx config depth N` | levels of references the snowball follows from the seeds; 0 = no snowball |
+| fetch | `rsx config fetch zotero\|manual` | `zotero`: `zot add` imports the papers and Zotero fetches the PDFs your institution licenses, so you connect to its network or VPN first. `manual`: litflow lists the DOIs (`.rsx/to-add.txt`) and you add them, e.g. with the Zotero Connector while logged in to your library |
+| seeds | `rsx snowball seed DOI ...` | the papers the snowball starts from |
+
+Then `rsx check` checks the tools, Zotero (with write access), Better BibTeX, the Google
+login, the refs.bib auto-export of the collection and which papers lack a PDF. Nothing starts
+until a check of the current settings passed; change a setting and it runs again.
+
+### The snowball
+
+From the seeds, `rsx` follows references level by level, up to the chosen depth:
+
+1. The papers of a level go into Zotero (`rsx snowball fetch`, then `rsx snowball sync`). A
+   DOI already in the snowball is never fetched again, so citation cycles end.
+2. A reader lists a paper's references (`rsx snowball refs DOI`: Crossref, bare DOIs named,
+   else the DOIs in the PDF) and decides every one: include, or exclude with a criterion
+   from `protocol.md`. A reference without a DOI is looked up (`rsx snowball find`) or
+   logged without importing.
+3. A verifier who is not that reader checks the decisions and may change them
+   (`rsx snowball confirm`). Only then do the inclusions become papers of the next level.
+4. Papers on the last level are fetched but not expanded.
+
+The log book `vault/snowball.md` shows the settings, every paper per level (Zotero status,
+PDF, who judged and confirmed its references), who cites whom as a mermaid graph, the
+included references without a DOI and the exclusions per criterion. Paper notes get
+`snowball_cites` links, so Obsidian's graph shows the citation network. The state is
+`vault/snowball.json`.
+
 ## The steps
 
 `rsx next` returns the first step that has open work. A later step does not start while an
@@ -53,7 +89,9 @@ from unreviewed answers.
 | Step | Who | Done when |
 |---|---|---|
 | fix | depends on the error | `obs lint` reports no errors |
+| setup | you, then lead | your choices are recorded and `rsx check` passed for them |
 | protocol | you | `vault/protocol.md` is filled in and `rsx protocol --settle` accepted it |
+| snowball | lead or you, lit-reader, lit-verifier | every paper above the chosen depth is in Zotero and refs.bib, and its references were judged by a reader and confirmed by a verifier |
 | map | lead | there is a map with question tickets |
 | grilling | you | you answered the scope questions the agents may not decide |
 | sync | lead | every entry of `refs.bib` is a paper in the vault |
@@ -191,7 +229,9 @@ refuse a reviewer whose `--by` name is the author's.
 | `rsx cite-check [DOC] [--json]` | check the draft's citations |
 | `rsx draft submit\|review\|show` | the draft's review cycle |
 | `rsx drive [--model M] [--rounds N] [--pi CMD]` | run the Pi lead again until done, a human step, two rounds without progress, or a model error (e.g. a timeout) |
-| `rsx doctor`, `rsx pi install` | setup |
+| `rsx config KEY VALUE`, `rsx check` | your setup choices; the startup check |
+| `rsx snowball seed\|fetch\|sync\|refs\|judge\|confirm\|find\|no-refs\|unavailable\|status\|log` | the citation snowball |
+| `rsx doctor`, `rsx pi install` | tools; Pi setup |
 
 ## Development
 
