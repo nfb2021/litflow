@@ -7,7 +7,7 @@ import pytest
 from obs.cli import app as obs_app
 from typer.testing import CliRunner
 
-from rsx import cite, gates, notebook
+from rsx import check, cite, gates, notebook, snowball
 from rsx import project as proj
 from rsx.cli import app as rsx_app
 
@@ -67,6 +67,11 @@ def lf(tmp_path, monkeypatch):
     LF.rsx("init", root, "--title", "VOD")
     monkeypatch.chdir(root)
     LF.rsx("notebook", "use", "none")  # the notebook has its own test
+    # the user's choices and a passing startup check (both have their own tests)
+    LF.rsx("config", "collection", "VOD")
+    LF.rsx("config", "depth", "0")
+    LF.rsx("config", "fetch", "manual")
+    check.record(proj.load(root), [])
     (root / "refs.bib").write_text(BIB.replace("PDFPATH", str(FIXTURE)))
     LF.root = root
     return LF
@@ -686,9 +691,12 @@ def test_the_notebook_finds_and_the_pdf_judges(lf, tmp_path, monkeypatch):
     # the user decides: a notebook, or local PDFs only
     proj.set_key(proj.load(lf.root), "notebook", "")
     a = nxt(lf)
-    assert (a["stage"], a["role"]) == ("notebook", "human")
+    assert (a["stage"], a["role"], a["items"]) == ("setup", "human", ["notebook"])
     assert gate(lf, "notebook")["verdict"] == "blocked"
     lf.rsx("notebook", "use", "https://notebook.google.com/notebook/test")
+    # a changed choice needs a new startup check
+    assert (nxt(lf)["stage"], nxt(lf)["role"]) == ("setup", "lead")
+    check.record(proj.load(lf.root), [])
     lf.rsx("ask", ok=False)  # nothing in the notebook yet
     a = nxt(lf)
     assert a["role"] == "lead" and a["commands"] == ["rsx notebook push"]
@@ -760,3 +768,328 @@ def test_the_notebook_finds_and_the_pdf_judges(lf, tmp_path, monkeypatch):
     assert "nothing quoted from" not in r.output
     cov = json.loads(lf.rsx("coverage", "--json").stdout)
     assert cov["Q-0003"]["doe2026gnsst"] == "unsearched"
+
+
+# --- setup and the snowball ------------------------------------------------------
+FAKE_ZOT = r"""#!/usr/bin/env python3
+import json, sys
+from pathlib import Path
+db = Path("{db}")
+items = json.loads(db.read_text()) if db.exists() else {{}}
+log = Path("{log}")
+args = sys.argv[1:]
+if args[0] == "add":
+    out = []
+    for doi in sys.stdin.read().split():
+        with log.open("a") as f:
+            f.write(doi + "\n")
+        status = "exists" if doi in items else "imported"
+        items.setdefault(doi, {{"key": "K" + str(len(items)), "pdf": doi != "10.9999/c"}})
+        out.append({{"input": doi, "status": status, "item": {{"itemKey": items[doi]["key"], "title": doi}}, "pdfs": []}})
+    db.write_text(json.dumps(items))
+    print(json.dumps(out))
+elif args[0] == "pdfs":
+    print(json.dumps([{{"key": v["key"], "doi": d, "title": d, "pdf": "/x.pdf" if v["pdf"] else None}} for d, v in items.items()]))
+"""
+
+
+def crossref(root: Path, doi: str, refs: list[dict], title: str = "") -> None:
+    cache = root / ".rsx" / "crossref"
+    cache.mkdir(parents=True, exist_ok=True)
+    name = "".join(c if c.isalnum() or c in ".-_" else "_" for c in doi) + ".json"
+    msg = {
+        "title": [title or doi],
+        "author": [{"family": "Doe"}],
+        "issued": {"date-parts": [[2020]]},
+        "reference": refs,
+    }
+    (cache / name).write_text(json.dumps({"message": msg}))
+
+
+def test_setup_asks_the_user_before_anything_starts(tmp_path, monkeypatch):
+    runner = CliRunner()
+    for var in ("OBS_VAULT", "RSX_PROJECT"):
+        monkeypatch.delenv(var, raising=False)
+    root = tmp_path / "p"
+
+    def rsx(*args, ok=True):
+        r = runner.invoke(rsx_app, [str(a) for a in args])
+        assert (r.exit_code == 0) == ok, r.output
+        return r
+
+    rsx("init", root, "--title", "T")
+    monkeypatch.chdir(root)
+    a = json.loads(rsx("next", "--json").stdout)[0]
+    assert (a["stage"], a["role"]) == ("setup", "human")
+    assert a["items"] == ["collection", "notebook", "depth", "fetch"]
+    assert any("ask the user" in c for c in a["commands"])
+    rsx("config", "depth", "two", ok=False)
+    rsx("config", "fetch", "scihub", ok=False)
+    rsx("config", "colour", "x", ok=False)
+    rsx("config", "collection", "GNSS-T")
+    rsx("config", "depth", "2")
+    rsx("config", "fetch", "zotero")
+    rsx("notebook", "use", "none")
+    # a snowball needs seeds, named by the user
+    a = json.loads(rsx("next", "--json").stdout)[0]
+    assert a["items"] == ["seeds"]
+    rsx("snowball", "seed", "https://doi.org/10.9999/A")
+    a = json.loads(rsx("next", "--json").stdout)[0]
+    assert (a["stage"], a["role"]) == ("setup", "lead") and "rsx check" in a[
+        "commands"
+    ][0]
+    p = proj.load(root)
+    check.record(
+        p,
+        [
+            {
+                "group": "services",
+                "item": "Zotero",
+                "ok": False,
+                "level": "error",
+                "fix": "start it",
+            }
+        ],
+    )
+    assert json.loads(rsx("next", "--json").stdout)[0]["stage"] == "setup"
+    check.record(
+        p,
+        [
+            {
+                "group": "export",
+                "item": "PDFs",
+                "ok": False,
+                "level": "warn",
+                "fix": "VPN",
+            }
+        ],
+    )
+    assert json.loads(rsx("next", "--json").stdout)[0]["stage"] == "protocol"
+    assert snowball.load(p)["seeds"] == ["10.9999/a"]
+
+
+def test_snowball_follows_references_n_levels_and_never_twice(
+    lf, tmp_path, monkeypatch
+):
+    bindir, db, log = tmp_path / "bin", tmp_path / "zot.json", tmp_path / "zot.log"
+    bindir.mkdir()
+    (bindir / "zot").write_text(FAKE_ZOT.format(db=db, log=log))
+    (bindir / "zot").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bindir}:/usr/bin:/bin")
+    monkeypatch.setenv("RSX_CROSSREF_OFFLINE", "1")
+    root = lf.root
+    # A cites B, a bare DOI C, an unrelated D and an IGARSS paper without a DOI;
+    # B cites A back (a cycle) and E
+    crossref(
+        root,
+        "10.9999/a",
+        [
+            {
+                "key": "1",
+                "DOI": "10.9999/b",
+                "article-title": "GNSS transmissometry of a beech canopy",
+                "year": "2019",
+            },
+            {"key": "2", "DOI": "10.9999/c"},
+            {
+                "key": "3",
+                "DOI": "10.9999/d",
+                "article-title": "Soil carbon in the Alps",
+                "year": "2001",
+            },
+            {
+                "key": "4",
+                "unstructured": "Roe 2017, GNSSBio: forest biomass from a GNSS ground receiver, IGARSS",
+            },
+        ],
+        "Seed",
+    )
+    crossref(
+        root,
+        "10.9999/b",
+        [
+            {"key": "1", "DOI": "10.9999/a", "article-title": "Seed", "year": "2026"},
+            {
+                "key": "2",
+                "DOI": "10.9999/e",
+                "article-title": "GPS signal attenuation by trees",
+                "year": "2010",
+            },
+        ],
+        "B",
+    )
+    crossref(root, "10.9999/c", [], "GNSS VOD in a pine forest")
+    crossref(
+        root,
+        "10.9999/e",
+        [{"key": "1", "DOI": "10.9999/f", "article-title": "Deeper", "year": "1990"}],
+        "E",
+    )
+
+    fill_protocol(root)
+    lf.rsx("protocol", "--settle")
+    lf.rsx("config", "depth", "2")
+    lf.rsx("config", "fetch", "zotero")
+    lf.rsx("snowball", "seed", "10.9999/a")
+    check.record(proj.load(root), [])
+
+    a = nxt(lf)
+    assert (a["stage"], a["role"]) == ("snowball", "lead") and "VPN" in a["commands"][0]
+    lf.rsx("snowball", "fetch")
+    # the export has not caught up: the user is asked to set it up
+    a = nxt(lf)
+    assert (a["stage"], a["role"]) == ("snowball", "human") and "Keep updated" in a[
+        "commands"
+    ][0]
+    bib = lambda *dois: (root / "refs.bib").write_text(  # noqa: E731
+        "".join(
+            f"@article{{k{i},\n  title = {{T}},\n  author = {{Doe, J}},\n  year = {{2020}},\n  doi = {{{d}}}\n}}\n"
+            for i, d in enumerate(dois)
+        )
+    )
+    bib("10.9999/a")
+    a = nxt(lf)
+    assert (a["stage"], a["role"], a["items"]) == (
+        "snowball",
+        "lit-reader",
+        ["10.9999/a"],
+    )
+
+    r = lf.rsx("snowball", "refs", "10.9999/a")
+    assert "Doe 2020 GNSS VOD in a pine forest" in r.output  # the bare DOI, named
+    # every reference needs a decision, an exclusion a criterion, an inclusion a DOI
+    lf.rsx("snowball", "judge", "10.9999/a", "-i", "1", "--by", "lit-reader", ok=False)
+    lf.rsx(
+        "snowball",
+        "judge",
+        "10.9999/a",
+        "-i",
+        "1",
+        "-i",
+        "4",
+        "--exclude-rest",
+        "E2: not GNSS",
+        "--by",
+        "lit-reader",
+        ok=False,
+    )
+    lf.rsx(
+        "snowball",
+        "judge",
+        "10.9999/a",
+        "-i",
+        "1",
+        "-x",
+        "3:off topic",
+        "--exclude-rest",
+        "E2: x",
+        "--by",
+        "lit-reader",
+        ok=False,
+    )
+    lf.rsx(
+        "snowball",
+        "judge",
+        "10.9999/a",
+        "-i",
+        "1",
+        "-i",
+        "4=none",
+        "--exclude-rest",
+        "E2: not GNSS",
+        "--by",
+        "lit-reader",
+    )
+    a = nxt(lf)
+    assert (a["role"], a["items"]) == ("lit-verifier", ["10.9999/a"])
+    lf.rsx(
+        "snowball", "confirm", "10.9999/a", "--by", "lit-reader", ok=False
+    )  # not your own
+    # the verifier finds the reader missed C
+    r = lf.rsx("snowball", "confirm", "10.9999/a", "-i", "2", "--by", "lit-verifier")
+    assert "2 new paper(s)" in r.output
+
+    lf.rsx("snowball", "fetch")
+    bib("10.9999/a", "10.9999/b", "10.9999/c")
+    a = nxt(lf)
+    assert a["role"] == "lit-reader" and sorted(a["items"]) == [
+        "10.9999/b",
+        "10.9999/c",
+    ]
+    lf.rsx("snowball", "judge", "10.9999/b", "-i", "1", "-i", "2", "--by", "lit-reader")
+    lf.rsx("snowball", "confirm", "10.9999/b", "--by", "lit-verifier")
+    lf.rsx("snowball", "fetch")
+    bib("10.9999/a", "10.9999/b", "10.9999/c", "10.9999/e")
+
+    # level 2 (E) is fetched but not expanded; A came back through B and was not
+    # fetched again; C has no reference list at all
+    s = snowball.load(proj.load(root))
+    assert {d: x["depth"] for d, x in s["papers"].items()} == {
+        "10.9999/a": 0,
+        "10.9999/b": 1,
+        "10.9999/c": 1,
+        "10.9999/e": 2,
+    }
+    assert log.read_text().split() == [
+        "10.9999/a",
+        "10.9999/b",
+        "10.9999/c",
+        "10.9999/e",
+    ]
+    a = nxt(lf)
+    assert a["items"] == ["10.9999/c"]
+    r = lf.rsx("snowball", "refs", "10.9999/c")
+    assert "no reference list" in r.output
+    lf.rsx(
+        "snowball",
+        "no-refs",
+        "10.9999/c",
+        "--reason",
+        "Crossref has none, no PDF",
+        "--by",
+        "lit-reader",
+    )
+    assert gate(lf, "snowball")["verdict"] == "pass"
+    assert nxt(lf)["stage"] == "map"
+
+    # the log book: who cites whom (with the cycle), what was left out and why
+    lf.obs("paper", "sync", "refs.bib")
+    lf.rsx("snowball", "log")
+    book = (root / "vault" / "snowball.md").read_text()
+    assert "[[k0]] cites [[k1]]" in book and "[[k1]] cites [[k0]]" in book
+    assert "GNSSBio" in book and "- E2: 1" in book
+    assert "```mermaid" in book and "not expanded (last level)" in book
+    assert "[[k1]]" in (root / "vault" / "papers" / "k0.md").read_text()
+    lf.obs("lint")
+
+
+def test_manual_fetch_lists_the_dois_for_the_user(lf, tmp_path, monkeypatch):
+    bindir, db, log = tmp_path / "bin", tmp_path / "zot.json", tmp_path / "zot.log"
+    bindir.mkdir()
+    (bindir / "zot").write_text(FAKE_ZOT.format(db=db, log=log))
+    (bindir / "zot").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bindir}:/usr/bin:/bin")
+    fill_protocol(lf.root)
+    lf.rsx("protocol", "--settle")
+    lf.rsx("config", "depth", "1")
+    lf.rsx("snowball", "seed", "10.9999/a", "10.9999/b")
+    check.record(proj.load(lf.root), [])
+    a = nxt(lf)
+    assert (a["stage"], a["role"]) == ("snowball", "human") and "by hand" in a["title"]
+    r = lf.rsx("snowball", "fetch")
+    assert (
+        "https://doi.org/10.9999/a" in r.output and not log.exists()
+    )  # nothing fetched
+    assert (lf.root / ".rsx/to-add.txt").read_text().split() == [
+        "https://doi.org/10.9999/a",
+        "https://doi.org/10.9999/b",
+    ]
+    db.write_text(
+        json.dumps({"10.9999/a": {"key": "K1", "pdf": True}})
+    )  # the user added A
+    r = lf.rsx("snowball", "sync")
+    assert "1 paper(s) arrived; 1 still to add" in r.output
+    lf.rsx("snowball", "unavailable", "10.9999/b", "--reason", "not in any library")
+    assert (
+        nxt(lf)["stage"] == "snowball" and nxt(lf)["role"] == "human"
+    )  # refs.bib export

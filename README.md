@@ -47,7 +47,15 @@ flowchart LR
 
     subgraph setup [Set up]
         direction TB
-        protocol["protocol<br/>criteria I1, E2 …"] --> map["map<br/>question tickets"] --> grilling["grilling<br/>only you answer"]
+        setupst["setup<br/>your choices + rsx check"] --> protocol["protocol<br/>criteria I1, E2 …"]
+    end
+    subgraph snow [Snowball]
+        direction TB
+        snowball["snowball<br/>references, N levels,<br/>judged + confirmed"]
+    end
+    subgraph ask [Ask]
+        direction TB
+        map["map<br/>question tickets"] --> grilling["grilling<br/>only you answer"]
     end
     subgraph collect [Collect]
         direction TB
@@ -70,7 +78,7 @@ flowchart LR
         draft["write<br/>draft + cite-check"] --> draftreview["draft-review<br/>every sentence"]
     end
 
-    fix --> setup --> collect --> find --> check --> answerp --> write
+    fix --> setup --> snow --> ask --> collect --> find --> check --> answerp --> write
 
     classDef human fill:#fbe3d6,stroke:#c2410c,color:#18232b
     classDef lead fill:#e6eaed,stroke:#52606b,color:#18232b
@@ -79,10 +87,10 @@ flowchart LR
     classDef verifier fill:#dcf1e3,stroke:#15803d,color:#18232b
     classDef critic fill:#f8dddd,stroke:#b91c1c,color:#18232b
     classDef writer fill:#ebe2fd,stroke:#7c3aed,color:#18232b
-    class protocol,grilling human
+    class setupst,protocol,grilling human
     class fix,map,sync,notebook,stuck lead
     class pdf,trace scout
-    class screen,extract,answer reader
+    class snowball,screen,extract,answer reader
     class verify verifier
     class review,draftreview critic
     class draft writer

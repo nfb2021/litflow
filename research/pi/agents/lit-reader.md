@@ -53,6 +53,27 @@ Always pass `--by lit-reader`.
    `rsx extracted KEY --none --note "<why>" --by lit-reader`.
 6. `rsx gate extract --paper KEY` must say pass. Fix what it lists (3 rounds max).
 
+## Snowball (action "snowball", judge references)
+
+Your task names one paper by DOI. Decide every one of its references against
+the scope and criteria of `vault/protocol.md`; you never fetch papers.
+
+1. `cat vault/protocol.md` (scope, I- and E-criteria), then
+   `rsx snowball refs DOI`: the references, numbered; "in snowball" marks
+   papers already in it.
+2. Include a reference when its title (and venue) shows it is in scope.
+   When unsure from the title, include it: the verifier and the screening
+   later can still drop it; a reference left out is lost for good.
+3. A reference you include that has no DOI: `rsx snowball find "<its text>"`;
+   give the matching DOI as `N=10.…`, or `N=none` if none matches (it is
+   logged, not imported).
+4. One command for the whole paper, every reference decided:
+   `rsx snowball judge DOI -i 3 -i 12 -i 40=10.1109/… -x 7:'E2: positioning, not vegetation' --exclude-rest 'E2: not GNSS through vegetation' --by lit-reader`
+   Give named exclusions (`-x`) for references that look close to the scope,
+   so the verifier sees why.
+5. No reference list at all (the command says so):
+   `rsx snowball no-refs DOI --reason "<what you tried>" --by lit-reader`.
+
 ## Screening (action "screen")
 
 `cat vault/protocol.md`, then per paper `obs show KEY` (title, venue, year;

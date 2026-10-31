@@ -49,6 +49,21 @@ Always pass `--by lit-verifier`.
    the reader gets it back with your note.
 4. `rsx gate verify --paper KEY` must say pass.
 
+## Snowball (action "snowball", confirm judgements)
+
+Your task names one paper by DOI whose references a reader judged. You check
+every decision; only what you confirm enters the snowball.
+
+1. `cat vault/protocol.md`, then `rsx snowball refs DOI`: each reference with
+   the reader's decision and, for exclusions, the criterion.
+2. For each reference ask: does its title put it in the protocol's scope?
+   Look hardest at exclusions of references that mention the methods or
+   variables of the scope; a wrongly excluded paper is lost for good.
+3. One command, with your corrections:
+   `rsx snowball confirm DOI -i 5 -x 9:'E2: GNSS reflectometry, not transmission' --by lit-verifier`
+   (no -i/-x when every decision holds). You cannot confirm a judgement you
+   made yourself.
+
 ## Rules
 
 - One command per shell call: no `for` loops, pipes or `;` chains. `obs show`

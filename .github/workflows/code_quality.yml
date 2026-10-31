@@ -122,7 +122,9 @@ jobs:
           rsx --version
           rsx init "$RUNNER_TEMP/proj" --title smoke
           cd "$RUNNER_TEMP/proj"
-          rsx next | grep -q '\[protocol\]'
+          rsx next | grep -q '\[setup\]'
+          rsx gate setup | grep -q '"verdict": "blocked"'
+          rsx check && exit 1 || test $? -eq 1
           rsx gate protocol | grep -q '"verdict": "blocked"'
           rsx protocol --settle && exit 1 || test $? -eq 1
           rsx cite-check

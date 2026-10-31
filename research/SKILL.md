@@ -19,13 +19,27 @@ rsx next  ->  who? human: ask the user  |  lead: do it  |  lit-*: delegate
 ```
 
 Step 0, every session: `rsx status` (in the project folder). No project →
-`rsx init PATH --title "..."`, then ask the user to point a Better BibTeX
-auto-export of their Zotero collection at `PATH/refs.bib`.
+`rsx init PATH --title "..."`. Then `rsx next` starts with **setup**: ask the
+user, one question at a time, for what only they decide, and record each
+answer. Never pick a value yourself, not even an obvious one:
+
+- the Zotero collection (`rsx config collection "NAME"`),
+- the Gemini Notebook (`rsx notebook use URL|none`; they create an empty one),
+- how many levels of references the snowball follows (`rsx config depth N`, 0 = none),
+- how papers get into Zotero (`rsx config fetch zotero|manual`): Zotero fetches
+  them, with the user on the institution's network or VPN, or the user adds
+  them by hand from the DOI links litflow gives,
+- the seed papers, when depth > 0 (`rsx snowball seed DOI ...`).
+
+Then `rsx check`, the startup check: tools, Zotero with write access, Better
+BibTeX, the Google login, the refs.bib auto-export, PDFs. Tell the user each
+failed item and its fix, and run it again once they fixed it. Nothing else
+starts before a check of the current settings passed.
 
 1. `rsx next`. It prints one stage: the role, the items, the exact commands,
    and the gate. With `--json` it adds a `workflow` for Pi.
 2. By role:
-   - **human**: the protocol and `grilling` tickets. Ask the user ONE question
+   - **human**: setup, the protocol and `grilling` tickets. Ask the user ONE question
      at a time, in plain words, and wait. Write their answer down verbatim
      (`obs q answer Q-… --human-said "<their words>" --by lead`, or into
      `vault/protocol.md`). Never answer for them; never guess scope.
@@ -64,7 +78,9 @@ Every step has a typed gate (`rsx gate … --json`), so a child that says
 | Stage | Role | Done when (gate) |
 |---|---|---|
 | fix | per error | `obs lint` has no errors (`gate vault`) |
+| setup | human, then lead | the user's choices are recorded and `rsx check` passed for them |
 | protocol | human | protocol.md filled in and settled (`rsx protocol --settle`) |
+| snowball | lead or human, lit-reader, lit-verifier | every paper above the chosen depth: in Zotero (or unavailable), in refs.bib, every reference judged against the protocol and the judgement confirmed by another agent |
 | map | lead | a map with question tickets |
 | grilling | human | the user answered every grilling ticket on the frontier |
 | sync | lead | every refs.bib entry is a paper note (`obs paper sync refs.bib`) |
@@ -99,7 +115,15 @@ unreviewed answers.
 | `rsx review Q-… --ok\|--block --note … --by ROLE` | critic's verdict on an answer (not on your own) |
 | `rsx cite-check [DOC] [--json]` | every cited paper included with verified claims; every citing paragraph names its `// C-…` claims |
 | `rsx draft submit --by ROLE` / `rsx draft review --ok\|--block --finding "line N: …" … --by ROLE` | the draft's review cycle (hash-bound) |
-| `rsx doctor`, `rsx pi install` | setup |
+| `rsx config collection\|depth\|fetch VALUE` | record a choice the user made |
+| `rsx check` | the startup check; the workflow waits for a pass |
+| `rsx snowball seed DOI ...` | the user's seed papers |
+| `rsx snowball fetch` / `rsx snowball sync` | get the papers into Zotero (zot add, or DOI links for the user) / read what arrived |
+| `rsx snowball refs DOI` | a paper's references, numbered, marked when already in the snowball |
+| `rsx snowball judge DOI -i N -i N=10.… -x N:'E2: why' --exclude-rest 'E2: why' --by lit-reader` | a decision for every reference |
+| `rsx snowball confirm DOI [-i N] [-x N:'E2: why'] --by lit-verifier` | another agent checks the judgement; then the inclusions enter the next level |
+| `rsx snowball find "title"`, `rsx snowball no-refs`, `rsx snowball unavailable` | a reference without a DOI; a paper without a reference list; a paper nobody can get |
+| `rsx doctor`, `rsx pi install` | tools; Pi setup |
 
 The vault itself is the `obsidian` skill (`obs`); papers come in with the
 `zotero` skill (`zot`); `gnb` queries a Gemini Notebook of the PDFs; the draft
@@ -116,8 +140,10 @@ and the verifier checks them there.
 
 ## Rules for the lead
 
-- `rsx notebook use` is the user's decision (a notebook, or `none`): ask the
-  user, never run it yourself.
+- The setup choices (collection, notebook, depth, fetch, seeds) and the
+  protocol are the user's decisions: ask the user, never pick or run them
+  yourself. Before Zotero fetches papers (fetch = zotero), ask the user to
+  connect to the institution's network or VPN and wait for their yes.
 - Do not skip a stage, edit the vault by hand, or mark work done that a gate
   blocks. If a gate seems wrong, tell the user; do not work around it.
 - Keep agents apart: the verifier never extracts what it verifies, the critic
