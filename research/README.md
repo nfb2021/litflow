@@ -9,6 +9,9 @@ follow the same steps.
 It is built for small models (the free university models in Pi): the rules are in the
 commands and the checks, not only in the prompts.
 
+Diagrams of the stages, the control loop, the notebook and the checks between agents are in
+[docs/workflow.md](../docs/workflow.md).
+
 ## Setup
 
 ```bash
