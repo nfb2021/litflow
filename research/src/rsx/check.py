@@ -50,8 +50,10 @@ ASK = {
     ),
     "fetch": (
         "rsx config fetch zotero|manual",
-        "Should Zotero fetch the papers itself (you connect to the institution's network "
-        "or VPN first), or should litflow give you the DOIs to add by hand?",
+        (
+            "Should Zotero fetch the papers itself (you connect to the institution's network "
+            "or VPN first), or should litflow give you the DOIs to add by hand?"
+        ),
     ),
 }
 

@@ -314,8 +314,10 @@ def s_snowball(x: Ctx) -> list[Action]:
                 "The vault learns about papers from refs.bib only.",
                 items=w["bib"],
                 commands=[
-                    f"# the user: in Zotero right-click '{p.collection}' > Export Collection > "
-                    f"Better BibTeX, tick 'Keep updated', save as {x.bib_rel} (once per project)",
+                    (
+                        f"# the user: in Zotero right-click '{p.collection}' > Export Collection > "
+                        f"Better BibTeX, tick 'Keep updated', save as {x.bib_rel} (once per project)"
+                    ),
                     "rsx gate snowball",
                 ],
                 gate="rsx gate snowball",
@@ -333,8 +335,10 @@ def s_snowball(x: Ctx) -> list[Action]:
                 items=w["judge"],
                 commands=[
                     "rsx snowball refs KEY",
-                    "rsx snowball judge KEY --include N --include N=10.… --exclude N:'E2: why' "
-                    "--exclude-rest 'E2: why' --by lit-reader",
+                    (
+                        "rsx snowball judge KEY --include N --include N=10.… --exclude N:'E2: why' "
+                        "--exclude-rest 'E2: why' --by lit-reader"
+                    ),
                     "# a reference without a DOI: rsx snowball find 'title', then N=10.… (or N=none)",
                     "# no reference list at all: rsx snowball no-refs KEY --reason '…' --by lit-reader",
                 ],
