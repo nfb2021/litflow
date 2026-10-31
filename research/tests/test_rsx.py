@@ -249,11 +249,15 @@ def test_workflow_end_to_end(lf):
         "draft",
         "review",
         "--block",
-        "--text",
-        "line 18: add the site",
+        "--finding",
+        "line 18: add the site -> name it",
+        "-f",
+        "line 20: no citation -> cite C-0001",
         "--by",
         "lit-critic",
     )
+    review_md = sorted((lf.root / "reviews").glob("*-review.md"))[-1].read_text()
+    assert "line 18: add the site -> name it\nline 20: no citation" in review_md
     a = nxt(lf)
     assert a["stage"] == "write" and a["title"] == "Revise the draft"
     # an edit after submission needs a new submission before review

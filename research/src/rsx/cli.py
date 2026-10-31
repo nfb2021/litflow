@@ -860,6 +860,9 @@ def draft_submit(by: str = ByOpt, project: Path = ProjectOpt) -> None:
 def draft_review(
     ok: bool = typer.Option(False, "--ok", help="The draft holds"),
     block: bool = typer.Option(False, "--block", help="It must be revised"),
+    finding: list[str] = typer.Option(
+        None, "--finding", "-f", help="One finding, `line N: problem -> fix`; repeat"
+    ),
     file: Path = typer.Option(
         None, "--file", help="Findings, one per line, with line numbers"
     ),
@@ -871,7 +874,11 @@ def draft_review(
     if err := refuse_lead("lit-critic", "Reviewing the draft"):
         fail(err)
     p = open_project(project)
-    findings = file.read_text("utf-8") if file else (text or "")
+    if file and not file.exists():
+        fail(f"{file} does not exist; pass findings with --finding instead")
+    findings = "\n".join(
+        [*(finding or []), *([file.read_text("utf-8")] if file else []), text or ""]
+    ).strip()
     try:
         path = review.review_draft(p, _verdict(ok, block), findings, by)
     except review.ReviewError as e:

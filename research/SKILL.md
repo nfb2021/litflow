@@ -98,7 +98,7 @@ unreviewed answers.
 | `rsx relink OLD NEW` | Better BibTeX gave a cited paper another key |
 | `rsx review Q-… --ok\|--block --note … --by ROLE` | critic's verdict on an answer (not on your own) |
 | `rsx cite-check [DOC] [--json]` | every cited paper included with verified claims; every citing paragraph names its `// C-…` claims |
-| `rsx draft submit --by ROLE` / `rsx draft review --ok\|--block --file F --by ROLE` | the draft's review cycle (hash-bound) |
+| `rsx draft submit --by ROLE` / `rsx draft review --ok\|--block --finding "line N: …" … --by ROLE` | the draft's review cycle (hash-bound) |
 | `rsx doctor`, `rsx pi install` | setup |
 
 The vault itself is the `obsidian` skill (`obs`); papers come in with the

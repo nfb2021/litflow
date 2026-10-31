@@ -166,7 +166,7 @@ def review_draft(project: Project, verdict: str, findings: str, by: str) -> str:
             f"the draft was submitted by {by}; a different agent reviews it"
         )
     if not findings.strip():
-        raise ReviewError("findings are required (--file or --text)")
+        raise ReviewError("findings are required (--finding, repeated)")
     return _write(
         project,
         "review",

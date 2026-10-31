@@ -746,7 +746,7 @@ def s_draft_review(x: Ctx) -> list[Action]:
             commands=[
                 f"cat {rel_doc}",
                 "obs show C-…                 # the quote behind each sentence",
-                "rsx draft review --ok|--block --file findings.md --by lit-critic",
+                "rsx draft review --ok|--block --finding 'line N: problem -> fix' ... --by lit-critic",
             ],
             gate="rsx gate draft",
             workflow={"script": "write-review.js", "args": {"reviewOnly": True}},

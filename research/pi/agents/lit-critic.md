@@ -15,7 +15,7 @@ what is wrong. An answer or draft you pass is one you tried to break and could
 not. Blocking with clear findings is a good outcome, not a failure.
 
 Work in the project folder (it has `rsx.toml`). Use `obs` and `rsx` only;
-write files only for draft findings. Always pass `--by lit-critic`.
+write no files. Always pass `--by lit-critic`.
 
 ## Reviewing an answered question (action "review")
 
@@ -54,11 +54,10 @@ you found, or say none were found and where you looked:
    Does the sentence follow from the quotes, at their strength? Does it cite
    the origin, not a paper repeating it? Is any sentence without citation a
    finding from the literature (it must not be)?
-3. Write findings to `reviews/findings.md` with the Write tool (in the project,
-   nowhere else), one per line:
-   `line N: <problem> -> <fix>`. Then
-   `rsx draft review --ok|--block --file reviews/findings.md --by lit-critic`.
-   `--ok` still needs a file: what you checked.
+3. Record the review in one command, one `--finding` per finding,
+   `line N: <problem> -> <fix>`:
+   `rsx draft review --block --finding "line 12: … -> …" --finding "line 30: … -> …" --by lit-critic`.
+   `--ok` still needs findings: what you checked.
 4. `rsx gate draft` must say pass.
 
 ## Rules
