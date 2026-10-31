@@ -529,7 +529,24 @@ def notebook_push(
         for x in v.of_type("paper")
         if x.fm.get("screening") == "included" and not x.fm.get("in_notebook")
     ]
-    todo = [(x, pdf) for x, pdf in todo if pdf]
+    if not any(x.fm.get("screening") == "included" for x in v.of_type("paper")):
+        fail(
+            "no included paper in the vault: `rsx snowball sync` (snowball papers) "
+            "or `obs paper sync refs.bib` and `obs paper screen`"
+        )
+    no_pdf = [x.id for x, pdf in todo if not pdf]
+    if no_pdf:
+        info(f"{len(no_pdf)} included paper(s) without a PDF: {', '.join(no_pdf)}")
+    # one copy per DOI: Zotero duplicates of a paper are one source
+    sent = {str(x.fm.get("doi") or "").lower() for x in notebook.in_notebook(v)}
+    seen: set[str] = set()
+    picked = []
+    for x, pdf in todo:
+        doi = str(x.fm.get("doi") or "").lower()
+        if pdf and not (doi and (doi in sent or doi in seen)):
+            seen.add(doi)
+            picked.append((x, pdf))
+    todo = picked
     if not todo:
         typer.echo("every included PDF is in the notebook")
         return
@@ -1211,7 +1228,8 @@ def snowball_sync(project: Path = ProjectOpt) -> None:
     p = open_project(project)
     r = _snow(snowball.sync, p)
     typer.echo(
-        f"{len(r['arrived'])} paper(s) arrived; {len(r['missing'])} still to add"
+        f"{len(r['arrived'])} paper(s) arrived; {len(r['missing'])} still to add; "
+        f"{len(r['screened'])} paper note(s) screened in"
     )
     for d in r["missing"]:
         typer.echo(f"  missing  https://doi.org/{d}")

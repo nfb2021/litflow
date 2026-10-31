@@ -51,8 +51,9 @@ ASK = {
     "fetch": (
         "rsx config fetch zotero|manual",
         (
-            "Should Zotero fetch the papers itself (you connect to the institution's network "
-            "or VPN first), or should litflow give you the DOIs to add by hand?"
+            "Should Zotero fetch the papers itself (open-access PDFs anywhere, licensed "
+            "ones on the institution's network or VPN; the rest you add afterwards), or "
+            "should litflow give you the DOIs to add by hand?"
         ),
     ),
 }
@@ -190,8 +191,10 @@ def run(p: Project) -> list[dict]:
                     "PDFs",
                     not no_pdf,
                     f"{len(no_pdf)} of {len(rows)} papers have no PDF: on the institution's "
-                    "network or VPN select them in Zotero > Find Available PDF, or add them "
-                    "by hand (`zot pdfs -c COLLECTION --missing` lists them)",
+                    "network or VPN select them in Zotero > Find Available PDF; without one, "
+                    "open each DOI link, log in with 'Access through your institution' and "
+                    "save the PDF with the Zotero Connector "
+                    "(`zot pdfs -c COLLECTION --missing` lists them)",
                     "warn",
                 )
             )

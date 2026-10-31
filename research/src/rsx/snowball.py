@@ -396,6 +396,7 @@ def sync(p: Project) -> dict:
         raise SnowballError(f"zot pdfs failed (exit {r.returncode}):\n{tail}") from e
     s = load(p)
     arrived = []
+    seen: set[str] = set()
     for row in rows:
         d = norm(row.get("doi") or "")
         x = s["papers"].get(d)
@@ -403,6 +404,9 @@ def sync(p: Project) -> dict:
             continue
         if "zotero" not in x:
             arrived.append(d)
+        elif d in seen and not row.get("pdf"):
+            continue  # a duplicate item without a PDF: keep the one with it
+        seen.add(d)
         x.update(
             zotero=row["key"],
             pdf=bool(row.get("pdf")),
@@ -411,12 +415,83 @@ def sync(p: Project) -> dict:
         x.setdefault("imported", "added by hand")
     save(p, s)
     return {
+        "screened": to_vault(p, s),
         "arrived": arrived,
         "missing": to_import(s),
         "no_pdf": [
             d for d, x in s["papers"].items() if x.get("zotero") and not x.get("pdf")
         ],
     }
+
+
+def _decided_by(s: dict, doi: str) -> str:
+    """Who confirmed a snowball paper's inclusion: the verifier of a paper that
+    cites it, or the user for a seed."""
+    for x in s["papers"].values():
+        refs = x.get("refs") or {}
+        if refs.get("confirmed_by") and any(
+            r.get("doi") == doi and r.get("decision") == "include" for r in refs["list"]
+        ):
+            return refs["confirmed_by"]
+    return "human"
+
+
+def _bib_dois(p: Project) -> dict[str, str]:
+    """citekey -> DOI of the Better BibTeX export."""
+    if not p.bib.exists():
+        return {}
+    return {
+        e["ID"]: norm(bib.clean(e.get("doi", "")))
+        for e in bib.parse_bib(p.bib.read_text("utf-8", errors="replace"))
+    }
+
+
+def to_vault(p: Project, s: dict) -> list[str]:
+    """Paper notes for the snowball papers in refs.bib, screened as included:
+    the reader and verifier have decided already, and `rsx notebook push` takes
+    only included papers. Every note of a DOI counts (Zotero can hold
+    duplicates); a decision someone recorded is never changed."""
+    if not p.bib.exists():
+        return []
+    v = p.vault
+    have = {x.id for x in v.of_type("paper")}
+    for e in bib.parse_bib(p.bib.read_text("utf-8", errors="replace")):
+        if e["ID"] in have or norm(bib.clean(e.get("doi", ""))) not in s["papers"]:
+            continue
+        fields = bib.paper_fields(e)
+        v.create(
+            "paper",
+            {**fields, "screening": "pending"},
+            f"\n# {fields.get('title', e['ID'])}\n\n## Notes\n\n",
+            note_id=e["ID"],
+        )
+    out = []
+    for x in v.of_type("paper"):
+        d = norm(str(x.fm.get("doi") or ""))
+        if d not in s["papers"] or x.fm.get("screening") not in (None, "pending"):
+            continue
+        why = "seed paper" if d in s["seeds"] else "I2: snowball inclusion"
+        x.fm.update(
+            screening="included",
+            screening_reason=f"{why} (vault/snowball.md)",
+            screened_by=_decided_by(s, d),
+            screened=today(),
+        )
+        v.save(x)
+        out.append(x.id)
+    return out
+
+
+def unscreened(p: Project, s: dict) -> list[str]:
+    """Snowball papers in refs.bib without an included vault note."""
+    done = {
+        norm(str(x.fm.get("doi") or ""))
+        for x in p.vault.of_type("paper")
+        if x.fm.get("screening") == "included"
+    }
+    return sorted(
+        {d for d in _bib_dois(p).values() if d in s["papers"] and d not in done}
+    )
 
 
 def unavailable(p: Project, doi: str, reason: str) -> None:
@@ -480,6 +555,7 @@ def open_work(p: Project) -> dict:
             if x.get("refs") and not x["refs"].get("confirmed_by") and x["refs"]["list"]
         ],
         "bib": missing_from_bib(p, s) if papers else [],
+        "vault": unscreened(p, s) if papers else [],
         "no_pdf": [
             d for d, x in papers.items() if x.get("zotero") and not x.get("pdf")
         ],
