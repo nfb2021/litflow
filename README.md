@@ -14,9 +14,78 @@ other's work, and the commands enforce the rules so that smaller models can foll
 
 ## How the pieces fit
 
-```text
-protocol → map → screen → extract → verify → trace → answer → review → write → draft review
-papers:  zot add DOI → Zotero → Better BibTeX refs.bib → obs paper sync → vault
+```mermaid
+flowchart LR
+    zot["Zotero<br/>zot<br/>imports DOIs, fetches PDFs"]
+    vault["Obsidian vault<br/>obs<br/>papers · claims with quote + page<br/>statements · question tickets<br/>answers · reviews"]
+    gnb["Gemini Notebook<br/>gnb<br/>searches all PDFs at once"]
+    typ["Typst draft<br/>typst<br/>paper/main.typ"]
+    rsx["Orchestrator<br/>rsx<br/>next step · gates · reviews"]
+    agents["Agents<br/>lead + scout, reader,<br/>verifier, critic, writer"]
+
+    zot -- "refs.bib (Better BibTeX)" --> vault
+    zot -- "PDF paths" --> vault
+    zot -- "PDFs: rsx notebook push" --> gnb
+    gnb -- "quotes per question" --> vault
+    vault -- "claims C-0001 …" --> typ
+    rsx <-- "reads state, records" --> vault
+    rsx -- "cite-check" --> typ
+    agents -- "rsx next" --> rsx
+    agents -. "obs commands" .-> vault
+
+    classDef hub fill:#e3ebf7,stroke:#2f5da8,stroke-width:2px,color:#18232b
+    class rsx hub
+```
+
+`rsx next` goes through the stages in order and returns the first one with open work. The
+colour shows who does it: orange is you, grey the lead, cyan `lit-scout`, blue
+`lit-reader`, green `lit-verifier`, red `lit-critic` and violet `lit-writer`.
+
+```mermaid
+flowchart LR
+    fix["fix<br/>vault errors first"]
+
+    subgraph setup [Set up]
+        direction TB
+        protocol["protocol<br/>criteria I1, E2 …"] --> map["map<br/>question tickets"] --> grilling["grilling<br/>only you answer"]
+    end
+    subgraph collect [Collect]
+        direction TB
+        sync["sync<br/>refs.bib → vault"] --> screen["screen<br/>include / exclude"] --> pdf["pdf<br/>get missing PDFs"]
+    end
+    subgraph find [Find]
+        direction TB
+        notebook["notebook<br/>push PDFs, ask"] --> extract["extract<br/>claims, per paper"]
+    end
+    subgraph check [Check]
+        direction TB
+        verify["verify<br/>recheck each claim"] --> trace["trace<br/>find the origin"]
+    end
+    subgraph answerp [Answer]
+        direction TB
+        answer["answer<br/>one ticket each"] --> review["review<br/>try to break it"] --> stuck["stuck<br/>release dead tickets"]
+    end
+    subgraph write [Write]
+        direction TB
+        draft["write<br/>draft + cite-check"] --> draftreview["draft-review<br/>every sentence"]
+    end
+
+    fix --> setup --> collect --> find --> check --> answerp --> write
+
+    classDef human fill:#fbe3d6,stroke:#c2410c,color:#18232b
+    classDef lead fill:#e6eaed,stroke:#52606b,color:#18232b
+    classDef scout fill:#d8f0f4,stroke:#0e7490,color:#18232b
+    classDef reader fill:#dde8fd,stroke:#2563eb,color:#18232b
+    classDef verifier fill:#dcf1e3,stroke:#15803d,color:#18232b
+    classDef critic fill:#f8dddd,stroke:#b91c1c,color:#18232b
+    classDef writer fill:#ebe2fd,stroke:#7c3aed,color:#18232b
+    class protocol,grilling human
+    class fix,map,sync,notebook,stuck lead
+    class pdf,trace scout
+    class screen,extract,answer reader
+    class verify verifier
+    class review,draftreview critic
+    class draft writer
 ```
 
 `rsx next` names the step, the role that does it (the user, the lead or one of the `lit-*`
@@ -24,7 +93,9 @@ agents) and the commands. Every step ends at a gate (`rsx gate STAGE`, one JSON 
 and no step starts while an earlier one has open work. An agent never checks its own work:
 `obs` refuses a verifier who extracted the claim, `rsx` refuses a critic who wrote the
 answer or the draft. A citation in the draft needs a verified claim of that paper in the
-same paragraph. See [research/README.md](research/README.md).
+same paragraph. [docs/workflow.md](docs/workflow.md) has all the diagrams: the control loop,
+how the Gemini Notebook is used, who checks whom, the coverage gate and citation tracing.
+The commands are in [research/README.md](research/README.md).
 
 ## Install a skill
 
