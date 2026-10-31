@@ -290,6 +290,9 @@ def pdfs(
     null: bool = typer.Option(
         False, "-0", "--null", help="Separate paths with NUL (for xargs -0)"
     ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Every item as JSON: key, DOI, title, PDF path or null"
+    ),
 ):
     """Print the local PDF paths of a collection's items, one per line."""
     if not (keys or collection):
@@ -300,6 +303,18 @@ def pdfs(
     except ZoteroError as e:
         _fail(e)
 
+    if as_json:
+        rows = [
+            {
+                "key": item["key"],
+                "doi": (item.get("DOI") or "").lower() or None,
+                "title": item.get("title", ""),
+                "pdf": (pdf_paths(item) or [None])[0],
+            }
+            for item in items
+        ]
+        typer.echo(json.dumps(rows, indent=1, ensure_ascii=False))
+        return
     with_pdf = 0
     for item in items:
         paths = pdf_paths(item)
