@@ -155,7 +155,7 @@ def init(
     except proj.ProjectError as e:
         fail(str(e))
     info(f"project created at {p.root}")
-    info("next: point a Better BibTeX auto-export at refs.bib, then `rsx next`")
+    info("next: `rsx next` (setup asks for your choices, then `rsx check`)")
     typer.echo(str(p.root))
 
 
