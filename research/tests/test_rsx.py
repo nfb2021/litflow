@@ -624,7 +624,8 @@ def test_review_refused_in_the_lead_pi_session(lf, monkeypatch):
 
 # --- the notebook finds, the PDF judges ------------------------------------------
 FAKE_GNB = """#!/bin/sh
-if [ "$1" = add ]; then echo "$@" >> "{log}"; exit 0; fi
+echo "$@" >> "{log}"
+if [ "$1" = add ]; then exit 0; fi
 cat "{answer}"
 """
 SENTENCE = (
@@ -745,3 +746,17 @@ def test_the_notebook_finds_and_the_pdf_judges(lf, tmp_path, monkeypatch):
     lf.obs("q", "add", "M-0001", "Does VOD depend on frequency?", "-k", "research")
     a = nxt(lf)
     assert a["stage"] == "notebook" and a["items"] == ["Q-0003"]
+
+    # a summary that cites sources but quotes none is asked again, then left
+    # to the readers: it cannot show that a paper is silent
+    says("VOD rises with canopy water [1] and has a diurnal cycle [2].")
+    r = lf.rsx("ask", "Q-0003")
+    assert "asking Q-0003 again for quotes" in r.output
+    assert "summarised without quotes, twice" in r.output
+    assert log.read_text().count("Give only quotes") == 1
+    assert json.loads((lf.root / ".rsx/notebook/Q-0003.json").read_text())[
+        "inconclusive"
+    ]
+    assert "nothing quoted from" not in r.output
+    cov = json.loads(lf.rsx("coverage", "--json").stdout)
+    assert cov["Q-0003"]["doe2026gnsst"] == "unsearched"

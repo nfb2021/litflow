@@ -596,8 +596,14 @@ def ask(
         info(f"asking the notebook {q.id}: {q.title}")
         try:
             answer = notebook.ask(p.notebook, notebook.prompt(q.title), timeout)
+            if notebook.summarised(answer):  # cites sources, quotes none: once more
+                info(f"  no quotes in the answer; asking {q.id} again for quotes")
+                answer = notebook.ask(
+                    p.notebook, notebook.prompt(q.title, strict=True), timeout
+                )
         except notebook.NotebookError as e:
             fail(f"{q.id}: {e}")
+        unsure = notebook.summarised(answer)
         found = notebook.anchor(notebook.quotes(answer), texts)
         record = {
             "question": q.id,
@@ -606,10 +612,12 @@ def ask(
             "papers": sorted(x.id for x in papers),
             "answer": answer,
             **found,
+            "inconclusive": unsure,
         }
         path = notebook.save(p, q.id, record)
         silent = []
-        for x in papers:
+        # a summary without quotes says nothing about which papers are silent
+        for x in [] if unsure else papers:
             searched = dict(x.fm.get("searched") or {})
             s = searched.get(q.id)
             if x.id in found["leads"]:
@@ -637,7 +645,12 @@ def ask(
             v.save(x)
         q.fm["asked"] = {"date": today(), "title": q.title, "papers": record["papers"]}
         v.save(q)
-        results[q.id] = {**found, "silent": silent, "file": p.rel(path)}
+        results[q.id] = {
+            **found,
+            "silent": silent,
+            "inconclusive": unsure,
+            "file": p.rel(path),
+        }
     if as_json:
         emit(results)
         return
@@ -649,6 +662,10 @@ def ask(
         for key, ls in r["leads"].items():
             pages = sorted({lead["page"] for lead in ls})
             typer.echo(f"  {key}: {len(ls)} lead(s), p. {', '.join(map(str, pages))}")
+        if r["inconclusive"]:
+            typer.echo(
+                "  the notebook summarised without quotes, twice: readers search every paper"
+            )
         if r["silent"]:
             typer.echo(
                 f"  nothing quoted from: {', '.join(r['silent'])} (a verifier confirms)"

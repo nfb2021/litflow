@@ -37,6 +37,11 @@ Go through every source, one by one. For each source that addresses this questio
 - quote, word for word and in the source's own language, every sentence that addresses the question. Put each quote in double quotation marks ("...") and do not shorten, translate or paraphrase inside the marks.
 Then list the sources that do not address the question. Use only the sources."""
 
+# sent once more when an answer quotes nothing: summaries cannot be checked
+STRICT = """Your answer had no word-for-word quotes. Answer again: {title}
+
+Give only quotes: for each source that addresses the question, its title, then every sentence that addresses it, copied word for word in the source's own language inside double quotation marks ("..."). No summary, no translation."""
+
 QUOTED = re.compile(r'"([^"]+)"|“([^”]+)”|„([^“”"]+)[“”"]|«([^»]+)»')
 CHIP = re.compile(r"\s*\[\d+(?:\s*[-–,]\s*\d+)*\]")  # citation chips: [1], [2-4]
 ELLIPSIS = re.compile(r"\s*(?:\.\.\.|…|\[\.\.\.\])\s*")
@@ -55,8 +60,13 @@ def gnb() -> str:
     return exe
 
 
-def prompt(title: str) -> str:
-    return PROMPT.format(title=title.strip())
+def prompt(title: str, strict: bool = False) -> str:
+    return (STRICT if strict else PROMPT).format(title=title.strip())
+
+
+def summarised(answer: str) -> bool:
+    """The answer cites sources ([1]) but quotes none of them."""
+    return bool(CHIP.search(answer)) and not quotes(answer)
 
 
 def quotes(answer: str) -> list[str]:
