@@ -14,6 +14,8 @@ Obsidian's graph shows the citation network.
 
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import json
 import os
 import re
@@ -88,10 +90,25 @@ def load(p: Project) -> dict:
 
 
 def save(p: Project, s: dict) -> None:
-    state_path(p).write_text(
-        json.dumps(s, indent=1, ensure_ascii=False) + "\n", "utf-8"
-    )
+    # a temporary file and a rename: a crash mid-write leaves the old state, not half a file
+    f = state_path(p)
+    tmp = f.with_name(f".{f.name}.tmp")
+    tmp.write_text(json.dumps(s, indent=1, ensure_ascii=False) + "\n", "utf-8")
+    os.replace(tmp, f)
     render(p, s)
+
+
+@contextlib.contextmanager
+def edit(p: Project):
+    """Load, change and save the state under an exclusive lock: two rsx runs at
+    once (a reader judging while a fetch runs) wait for each other instead of
+    overwriting each other's work. Nothing is saved if the block raises."""
+    lock = state_path(p).with_name(".snowball.lock")
+    with open(lock, "w") as fd:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        s = load(p)
+        yield s
+        save(p, s)
 
 
 def depth_of(p: Project) -> int | None:
@@ -99,17 +116,16 @@ def depth_of(p: Project) -> int | None:
 
 
 def seed(p: Project, dois: list[str]) -> list[str]:
-    s = load(p)
     added = []
-    for d in map(norm, dois):
-        if not DOI_RE.match(d):
-            raise SnowballError(f"not a DOI: {d}")
-        if d not in s["papers"]:
-            s["papers"][d] = {"depth": 0, "found_in": []}
-            added.append(d)
-        if d not in s["seeds"]:
-            s["seeds"].append(d)
-    save(p, s)
+    with edit(p) as s:
+        for d in map(norm, dois):
+            if not DOI_RE.match(d):
+                raise SnowballError(f"not a DOI: {d}")
+            if d not in s["papers"]:
+                s["papers"][d] = {"depth": 0, "found_in": []}
+                added.append(d)
+            if d not in s["seeds"]:
+                s["seeds"].append(d)
     return added
 
 
@@ -232,14 +248,19 @@ def _apply(rows: dict[int, dict], include, exclude, rest) -> None:
                 r.setdefault("why", rest.strip())
 
 
-def judge(p: Project, doi: str, include, exclude, rest: str | None, by: str) -> dict:
-    s = load(p)
-    doi = norm(doi)
+def _judgeable(s: dict, doi: str) -> dict:
     paper = s["papers"].get(doi)
     if paper is None:
         raise SnowballError(f"{doi} is not in the snowball")
     if paper.get("refs", {}).get("confirmed_by"):
         raise SnowballError(f"{doi}: its references are judged and confirmed already")
+    return paper
+
+
+def judge(p: Project, doi: str, include, exclude, rest: str | None, by: str) -> dict:
+    doi = norm(doi)
+    _judgeable(load(p), doi)
+    # Crossref can be slow: fetch the references before taking the lock
     source, refs = references(p, doi)
     rows = {r["n"]: dict(r) for r in refs}
     _apply(rows, include, exclude, rest)
@@ -249,75 +270,78 @@ def judge(p: Project, doi: str, include, exclude, rest: str | None, by: str) -> 
             f"{len(open_)} reference(s) without a decision: {', '.join(map(str, open_[:30]))}; "
             "--include N, --exclude N:'E2: why', or --exclude-rest 'E2: why'"
         )
-    paper["refs"] = {
-        "source": source,
-        "judged_by": by,
-        "judged": today(),
-        "list": [rows[n] for n in sorted(rows)],
-    }
-    save(p, s)
+    with edit(p) as s:
+        paper = _judgeable(s, doi)
+        paper["refs"] = {
+            "source": source,
+            "judged_by": by,
+            "judged": today(),
+            "list": [rows[n] for n in sorted(rows)],
+        }
     return paper["refs"]
 
 
 def no_refs(p: Project, doi: str, reason: str, by: str) -> None:
-    s = load(p)
-    paper = s["papers"].get(norm(doi))
-    if paper is None:
+    doi = norm(doi)
+    if doi not in load(p)["papers"]:
         raise SnowballError(f"{doi} is not in the snowball")
-    source, refs = references(p, norm(doi))
+    source, refs = references(p, doi)
     if refs:
         raise SnowballError(f"{doi} has {len(refs)} references ({source}): judge them")
-    paper["refs"] = {
-        "source": "none",
-        "judged_by": by,
-        "judged": today(),
-        "list": [],
-        "reason": reason,
-    }
-    save(p, s)
+    with edit(p) as s:
+        s["papers"][doi]["refs"] = {
+            "source": "none",
+            "judged_by": by,
+            "judged": today(),
+            "list": [],
+            "reason": reason,
+        }
 
 
 def confirm(p: Project, doi: str, by: str, include, exclude) -> list[str]:
     """The verifier's check of a judgement; returns the papers it adds."""
-    s = load(p)
-    doi = norm(doi)
-    paper = s["papers"].get(doi)
-    refs = (paper or {}).get("refs")
-    if not refs:
-        raise SnowballError(f"{doi}: its references are not judged yet")
-    if refs.get("confirmed_by"):
-        raise SnowballError(f"{doi}: confirmed already by {refs['confirmed_by']}")
-    if by == refs["judged_by"]:
-        raise SnowballError(
-            f"{by} judged these references; a different agent confirms them"
-        )
-    rows = {r["n"]: r for r in refs["list"]}
-    changes = []
-    for spec in include or []:
-        n, d = _pick(spec, rows)
-        if rows[n].get("decision") != "include":
-            changes.append(f"{n} included by {by}")
-        rows[n].update(decision="include", doi=d or rows[n]["doi"], no_doi=not d)
-        rows[n].pop("why", None)
-    for spec in exclude or []:
-        n, _, why = spec.partition(":")
-        if not n.strip().isdigit() or int(n) not in rows or not EXCLUDE_WHY.match(why):
-            raise SnowballError(f"exclude needs N:'E2: why', got {spec!r}")
-        if rows[int(n)].get("decision") != "exclude":
-            changes.append(f"{n} excluded by {by}")
-        rows[int(n)].update(decision="exclude", why=why.strip(), no_doi=False)
-    refs.update(confirmed_by=by, confirmed=today(), changes=changes)
-    added = []
-    for r in refs["list"]:
-        if r.get("decision") != "include" or r.get("no_doi") or not r.get("doi"):
-            continue
-        child = s["papers"].get(r["doi"])
-        if child is None:
-            s["papers"][r["doi"]] = {"depth": paper["depth"] + 1, "found_in": [doi]}
-            added.append(r["doi"])
-        elif doi not in child["found_in"]:
-            child["found_in"].append(doi)
-    save(p, s)
+    with edit(p) as s:
+        doi = norm(doi)
+        paper = s["papers"].get(doi)
+        refs = (paper or {}).get("refs")
+        if not refs:
+            raise SnowballError(f"{doi}: its references are not judged yet")
+        if refs.get("confirmed_by"):
+            raise SnowballError(f"{doi}: confirmed already by {refs['confirmed_by']}")
+        if by == refs["judged_by"]:
+            raise SnowballError(
+                f"{by} judged these references; a different agent confirms them"
+            )
+        rows = {r["n"]: r for r in refs["list"]}
+        changes = []
+        for spec in include or []:
+            n, d = _pick(spec, rows)
+            if rows[n].get("decision") != "include":
+                changes.append(f"{n} included by {by}")
+            rows[n].update(decision="include", doi=d or rows[n]["doi"], no_doi=not d)
+            rows[n].pop("why", None)
+        for spec in exclude or []:
+            n, _, why = spec.partition(":")
+            if (
+                not n.strip().isdigit()
+                or int(n) not in rows
+                or not EXCLUDE_WHY.match(why)
+            ):
+                raise SnowballError(f"exclude needs N:'E2: why', got {spec!r}")
+            if rows[int(n)].get("decision") != "exclude":
+                changes.append(f"{n} excluded by {by}")
+            rows[int(n)].update(decision="exclude", why=why.strip(), no_doi=False)
+        refs.update(confirmed_by=by, confirmed=today(), changes=changes)
+        added = []
+        for r in refs["list"]:
+            if r.get("decision") != "include" or r.get("no_doi") or not r.get("doi"):
+                continue
+            child = s["papers"].get(r["doi"])
+            if child is None:
+                s["papers"][r["doi"]] = {"depth": paper["depth"] + 1, "found_in": [doi]}
+                added.append(r["doi"])
+            elif doi not in child["found_in"]:
+                child["found_in"].append(doi)
     return added
 
 
@@ -341,8 +365,7 @@ def fetch(p: Project) -> dict:
         raise SnowballError(
             "how papers are fetched is not chosen: ask the user, `rsx config fetch zotero|manual`"
         )
-    s = load(p)
-    todo = to_import(s)
+    todo = to_import(load(p))
     if not todo or p.fetch == "manual":
         if todo:
             out = p.root / ".rsx" / "to-add.txt"
@@ -366,11 +389,12 @@ def fetch(p: Project) -> dict:
     except ValueError as e:
         tail = "\n".join((r.stderr or r.stdout).strip().splitlines()[-5:])
         raise SnowballError(f"zot add failed (exit {r.returncode}):\n{tail}") from e
-    for res in results:
-        d = norm(res.get("input", ""))
-        if d in s["papers"] and res.get("status") in ("imported", "exists"):
-            s["papers"][d]["imported"] = res["status"]
-    save(p, s)
+    # zot add ran without the lock: other runs may have saved meanwhile
+    with edit(p) as s:
+        for res in results:
+            d = norm(res.get("input", ""))
+            if d in s["papers"] and res.get("status") in ("imported", "exists"):
+                s["papers"][d]["imported"] = res["status"]
     sync(p)
     return {"mode": p.fetch, "todo": todo, "results": results}
 
@@ -394,26 +418,25 @@ def sync(p: Project) -> dict:
     except ValueError as e:
         tail = "\n".join((r.stderr or r.stdout).strip().splitlines()[-5:])
         raise SnowballError(f"zot pdfs failed (exit {r.returncode}):\n{tail}") from e
-    s = load(p)
     arrived = []
     seen: set[str] = set()
-    for row in rows:
-        d = norm(row.get("doi") or "")
-        x = s["papers"].get(d)
-        if x is None:
-            continue
-        if "zotero" not in x:
-            arrived.append(d)
-        elif d in seen and not row.get("pdf"):
-            continue  # a duplicate item without a PDF: keep the one with it
-        seen.add(d)
-        x.update(
-            zotero=row["key"],
-            pdf=bool(row.get("pdf")),
-            title=row.get("title") or x.get("title"),
-        )
-        x.setdefault("imported", "added by hand")
-    save(p, s)
+    with edit(p) as s:
+        for row in rows:
+            d = norm(row.get("doi") or "")
+            x = s["papers"].get(d)
+            if x is None:
+                continue
+            if "zotero" not in x:
+                arrived.append(d)
+            elif d in seen and not row.get("pdf"):
+                continue  # a duplicate item without a PDF: keep the one with it
+            seen.add(d)
+            x.update(
+                zotero=row["key"],
+                pdf=bool(row.get("pdf")),
+                title=row.get("title") or x.get("title"),
+            )
+            x.setdefault("imported", "added by hand")
     return {
         "screened": to_vault(p, s),
         "arrived": arrived,
@@ -497,12 +520,11 @@ def unscreened(p: Project, s: dict) -> list[str]:
 def unavailable(p: Project, doi: str, reason: str) -> None:
     """A paper nobody can get into Zotero: never fetched again; its references can
     still be judged from Crossref."""
-    s = load(p)
-    x = s["papers"].get(norm(doi))
-    if x is None:
-        raise SnowballError(f"{doi} is not in the snowball")
-    x.update(zotero=None, imported="unavailable", reason=reason, pdf=False)
-    save(p, s)
+    with edit(p) as s:
+        x = s["papers"].get(norm(doi))
+        if x is None:
+            raise SnowballError(f"{doi} is not in the snowball")
+        x.update(zotero=None, imported="unavailable", reason=reason, pdf=False)
 
 
 def find(p: Project, title: str, rows: int = 5) -> list[str]:
