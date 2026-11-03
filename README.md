@@ -12,6 +12,30 @@ other's work, and the commands enforce the rules so that smaller models can foll
 | [`obsidian`](obsidian/) | A research vault in Obsidian markdown: papers from the Better BibTeX export, claims with verbatim quotes checked against the PDF, citation provenance across papers, question maps with a frontier, and a lint gate for agent workflows. Comes with the `obs` command. |
 | [`research`](research/) | Runs the workflow. `rsx next` names the next step, the role that does it and the gate that checks it; five Pi agents (`lit-scout`, `lit-reader`, `lit-verifier`, `lit-critic`, `lit-writer`) do the work and check each other; `rsx cite-check` ties each cited sentence of the Typst draft to verified claims. Comes with the `rsx` command. |
 
+## Status
+
+Early: version 0.1. It has been used by one person, on macOS, for a few literature
+reviews, and nobody else has set it up from scratch yet. Expect rough edges and please
+report them as [issues](https://github.com/nfb2021/litflow/issues).
+
+Known limitations:
+
+- **Tested on macOS only.** CI installs and tests the commands on Ubuntu, so Linux should
+  work. Windows does not: the snowball state is locked with `fcntl`, which Windows lacks.
+- **Gemini Notebook is driven through its web page.** `gnb` controls Chrome with your Google
+  login, as a person would click. It breaks when Google changes the page, and Google may
+  limit automated use of an account. A notebook holds at most 50 sources on the free plan.
+- **Zotero is driven through a third-party plugin**
+  ([cookjohn/zotero-mcp](https://github.com/cookjohn/zotero-mcp)) with write access. `zot add`
+  imports items, files them into collections, and writes a DOI into an existing item whose
+  title and year match a DOI it was asked to import.
+- **Paywalled PDFs** come only through your institution's network, VPN or Zotero proxy.
+- **Reference lists come from Crossref**, which has them only when the publisher deposited
+  them; otherwise the DOIs are read from the PDF.
+- **Third-party parts have their own terms and licences**: Zotero, Better BibTeX, the Zotero
+  MCP plugin, Gemini Notebook (Google's terms), Chrome, Pi, Typst and the typst skill.
+  The code in each skill folder carries its own licence file.
+
 ## How the pieces fit
 
 ```mermaid
@@ -105,24 +129,85 @@ same paragraph. [docs/workflow.md](docs/workflow.md) has all the diagrams: the c
 how the Gemini Notebook is used, who checks whom, the coverage gate and citation tracing.
 The commands are in [research/README.md](research/README.md).
 
-## Install a skill
+## Requirements
+
+| Software | Needed for | Install |
+|---|---|---|
+| macOS (Linux untested) | everything | |
+| [uv](https://docs.astral.sh/uv/) and git | installing the four commands; uv brings Python ≥ 3.10 | `brew install uv git` |
+| [Zotero](https://www.zotero.org) 7 or newer, running | `zot`, `rsx` | zotero.org |
+| [Zotero MCP plugin](https://github.com/cookjohn/zotero-mcp/releases), *Enable Write Operations* ticked, port 23120 | `zot` reads and writes the library | `.xpi` from the releases page, see [zotero/README.md](zotero/README.md) |
+| [Better BibTeX](https://retorque.re/zotero-better-bibtex/) for Zotero | `refs.bib`, which `obs`, `rsx` and Typst read | `.xpi` from its site |
+| Google Chrome and a Google account with Gemini Notebook | `gnb`, `rsx notebook push` | google.com/chrome |
+| [Typst](https://typst.app) 0.15 or newer | the draft | `brew install typst` |
+| An agent harness: [Claude Code](https://claude.com/claude-code), or [Pi](https://pi.dev) with [pi-subagents](https://github.com/nicobailon/pi-subagents) for the five `lit-*` agents | running the workflow | see their docs |
+
+Optional: `poppler` (`brew install poppler`) reads PDF columns better; `ocrmypdf` and
+`tesseract-lang` make scanned PDFs readable; [Obsidian](https://obsidian.md) shows the vault
+(plain markdown, so any editor works); your institution's VPN or proxy brings paywalled PDFs.
+
+## Getting started
+
+**1. Install the commands and skills** (once):
 
 ```bash
-git clone git@github.com:nfb2021/litflow.git ~/src/litflow
-ln -s ~/src/litflow/gemini_notebook ~/.claude/skills/gemini_notebook
-ln -s ~/src/litflow/zotero ~/.claude/skills/zotero
-ln -s ~/src/litflow/obsidian ~/.claude/skills/obsidian
-ln -s ~/src/litflow/research ~/.claude/skills/research
+git clone https://github.com/nfb2021/litflow.git ~/src/litflow
+for s in gemini_notebook zotero obsidian research; do
+  uv tool install --editable ~/src/litflow/$s       # gnb, zot, obs, rsx
+done
+gnb auth setup        # a Chrome window opens: log in to Google
+zot status            # ✅ … Write operations enabled
+rsx doctor            # checks every tool above
 ```
 
-Each skill has its own README with setup steps. Skills with Python code are uv projects;
-each installs its command with `uv tool install --editable ~/src/litflow/<skill>`
-(`gnb` for `gemini_notebook`, `zot` for `zotero`, `obs` for `obsidian`, `rsx` for `research`).
-Logins and other personal data are stored outside the repository.
+For Claude Code, link the skills:
 
-For [Pi](https://pi.dev) with [pi-subagents](https://github.com/nicobailon/pi-subagents), the
-repository is a Pi package (`package.json`): `rsx pi install` adds it and the typst skill to
-`~/.pi/agent/settings.json`, which loads all skills and the five `lit-*` agents.
+```bash
+mkdir -p ~/.claude/skills
+for s in gemini_notebook zotero obsidian research; do
+  ln -s ~/src/litflow/$s ~/.claude/skills/$s
+done
+```
+
+For Pi, `rsx pi install` loads the skills and the five agents. Each skill's README has
+more on its setup. If a command is not found, run `uv tool update-shell` and open a new
+terminal. To update later: `git -C ~/src/litflow pull`.
+
+**2. Prepare a project** (once per review):
+
+1. In Zotero, create an empty collection for the review.
+2. In Gemini Notebook, create an empty notebook and copy its URL (or work without one).
+3. Create the project and make your choices; the agent asks for each of them anyway:
+
+   ```bash
+   rsx init ~/research/my-review --title "My review"
+   cd ~/research/my-review
+   rsx config collection "my-review"
+   rsx notebook use https://notebook.google.com/notebook/…
+   rsx config depth 2               # levels of references to follow; 0 = none
+   rsx config fetch zotero          # or manual: you add the papers yourself
+   rsx snowball seed 10.xxxx/…      # the papers you start from
+   ```
+
+4. In Zotero, right-click the collection → *Export Collection…* → **Better BibTeX**, tick
+   *Keep updated*, and save it as `refs.bib` in the project folder.
+5. If papers are paywalled, connect to your institution's network or VPN.
+
+**3. Run it.** Start your agent in the project folder and give it the question, e.g. *"Use
+the research skill: what does the literature say about X?"*. The agent runs `rsx next`,
+does the step it names, and passes that step's gate before moving on. You are asked at
+the points that are yours: the inclusion criteria (`vault/protocol.md`), PDFs it cannot
+get, questions only you can answer, and the draft. Run `rsx next` yourself any time to see
+where the review stands.
+
+**4. Read the results:**
+
+- `vault/snowball.md`: every paper per level, who cites whom, and why each reference was
+  included or excluded
+- `vault/`: paper notes, claims with verbatim quotes and pages, questions and answers;
+  open it as an Obsidian vault
+- `paper/main.typ`: the draft (`typst compile paper/main.typ`), each citation backed by a
+  verified claim
 
 ## Skills used from upstream
 

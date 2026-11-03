@@ -176,7 +176,7 @@ def init(path: Path, title: str) -> Project:
     if not p.bib.exists():
         p.bib.write_text(
             "% Better BibTeX auto-export of the project's Zotero collection.\n"
-            "% Zotero: right-click the collection > Export Collection > Better BibLaTeX,\n"
+            "% Zotero: right-click the collection > Export Collection > Better BibTeX,\n"
             "% tick 'Keep updated', save here.\n",
             "utf-8",
         )
@@ -187,5 +187,5 @@ def init(path: Path, title: str) -> Project:
     p.reviews.mkdir(exist_ok=True)
     gi = path / ".gitignore"
     if not gi.exists():
-        gi.write_text(".rsx/\n", "utf-8")
+        gi.write_text(".rsx/\n.snowball.lock\n", "utf-8")
     return p

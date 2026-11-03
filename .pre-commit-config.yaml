@@ -67,6 +67,12 @@ repos:
         entry: uv run --locked --project zotero --group docs marimo check
         language: system
         files: ^zotero/docs/.*\.py$
+      - id: pytest-zotero
+        name: pytest (zotero)
+        entry: uv run --locked --project zotero --group dev pytest -q zotero/tests
+        language: system
+        pass_filenames: false
+        files: ^zotero/
       - id: pytest-obsidian
         name: pytest (obsidian)
         entry: uv run --locked --project obsidian --group dev pytest -q obsidian/tests

@@ -1,6 +1,8 @@
 import json
 import shlex
 import shutil
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -1076,6 +1078,30 @@ def test_snowball_follows_references_n_levels_and_never_twice(
     assert "```mermaid" in book and "not expanded (last level)" in book
     assert "[[k1]]" in (root / "vault" / "papers" / "k0.md").read_text()
     lf.obs("lint")
+
+
+def test_snowball_writes_wait_for_each_other_and_lose_nothing(lf):
+    # a fetch holds the state for a long time; a judgement saved meanwhile must survive it
+    p = proj.load(lf.root)
+    inside = threading.Event()
+
+    def slow():
+        with snowball.edit(p) as s:
+            inside.set()
+            time.sleep(0.3)
+            s["papers"]["10.9999/x"] = {"depth": 0, "found_in": []}
+
+    t = threading.Thread(target=slow)
+    t.start()
+    inside.wait()
+    snowball.seed(p, ["10.9999/y"])
+    t.join()
+    assert {"10.9999/x", "10.9999/y"} <= set(snowball.load(p)["papers"])
+
+    # a refused change saves nothing
+    with pytest.raises(snowball.SnowballError):
+        snowball.seed(p, ["10.9999/z", "not-a-doi"])
+    assert "10.9999/z" not in snowball.load(p)["papers"]
 
 
 def test_manual_fetch_lists_the_dois_for_the_user(lf, tmp_path, monkeypatch):

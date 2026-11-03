@@ -38,18 +38,31 @@ def find_dois(text: str) -> list[str]:
     return [d for d in seen if "/" in d and len(d.split("/", 1)[1]) > 1]
 
 
+def crossref_work(doi: str, timeout: float = 30) -> dict:
+    """Crossref's record of a DOI; {} when the DOI is unknown or Crossref unreachable"""
+    url = CROSSREF + urllib.parse.quote(normalize_doi(doi), safe="/")
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.load(response)["message"]
+    except (urllib.error.URLError, KeyError, json.JSONDecodeError):
+        return {}
+
+
+def title_key(title: str) -> str:
+    """A title as lowercase letters and digits only, to compare titles that differ
+    in case, punctuation or markup ('<i>Humulus</i> lupulus' = 'Humulus Lupulus')"""
+    return re.sub(r"[^a-z0-9]+", "", re.sub(r"<[^>]+>", "", title).lower())
+
+
 def crossref_references(doi: str, timeout: float = 30) -> tuple[list[str], int]:
     """(DOIs of the references Crossref lists for DOI, number of references in total)
 
     Crossref knows the reference list when the publisher deposits it (most large
     publishers do). Returns ([], 0) when it does not, or when the DOI is unknown.
     """
-    url = CROSSREF + urllib.parse.quote(normalize_doi(doi), safe="/")
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            message = json.load(response)["message"]
-    except (urllib.error.URLError, KeyError, json.JSONDecodeError):
+    message = crossref_work(doi, timeout)
+    if not message:
         return [], 0
     references = message.get("reference") or []
     dois: dict[str, None] = {}

@@ -24,6 +24,7 @@ docs = [
     "marimo>=0.25.2",
 ]
 dev = [
+    "pytest>=8",
     "ruff>=0.17",
 ]
 
