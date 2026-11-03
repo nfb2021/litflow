@@ -41,7 +41,7 @@ vod-review/
   reviews/          draft submissions and reviews
 ```
 
-In Zotero, export the project's collection with Better BibLaTeX to `refs.bib` and tick
+In Zotero, export the project's collection with Better BibTeX to `refs.bib` and tick
 *Keep updated*. `obs` run anywhere in the project uses `vault/`.
 
 ### Setup: your choices and the startup check
