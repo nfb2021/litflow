@@ -40,7 +40,12 @@ app = typer.Typer(
 )
 
 ITEM_KEY_RE = re.compile(r"^[A-Z0-9]{8}$")
-WRITE_TOOLS = {"add_by_identifier", "create_collection"}
+WRITE_TOOLS = {
+    "add_by_identifier",
+    "add_items_to_collection",
+    "create_collection",
+    "write_metadata",
+}
 # Gemini Notebook's per-notebook source limit on the free plan
 NOTEBOOK_SOURCE_LIMIT = 50
 COLLECTION_HELP = "Collection name, path or 8-character key"
@@ -189,6 +194,71 @@ def _run_import(zot: ZoteroMCP, ids: list[str], **opts) -> list[dict]:
     return results
 
 
+def _year(date: str) -> str:
+    found = re.search(r"\b\d{4}\b", date or "")
+    return found.group(0) if found else ""
+
+
+def _same_paper_without_doi(zot: ZoteroMCP, doi: str) -> dict | None:
+    """The library item with this DOI's title and year but no DOI field, if any.
+
+    Zotero recognises existing items by DOI only, so a paper added by hand or
+    from a PDF without its DOI would be imported a second time.
+    """
+    from .refs import crossref_work, title_key
+
+    work = crossref_work(doi)
+    title = re.sub(r"<[^>]+>", "", (work.get("title") or [""])[0])
+    want = title_key(title)
+    if len(want) < 20:  # unknown, or too short to tell papers apart
+        return None
+    year = str(((work.get("issued") or {}).get("date-parts") or [[""]])[0][0] or "")
+    words = re.sub(r"[^\w]+", " ", title).strip()
+    for r in zot.call("search_library", q=words, limit=10).get("results", []):
+        if title_key(r.get("title") or "") != want:
+            continue
+        if year and _year(r.get("date")) not in ("", year):
+            continue
+        details = zot.call("get_item_details", itemKey=r["key"])
+        if isinstance(details, dict) and not details.get("DOI"):
+            return {"itemKey": r["key"], "title": r.get("title")}
+    return None
+
+
+def _file_title_matches(
+    zot: ZoteroMCP, ids: list[str], target: dict | None, dry_run: bool
+) -> list[dict]:
+    """Rows for the DOIs whose paper is in the library without a DOI: filed into
+    the collection and given the DOI (so the next lookup by DOI finds them),
+    instead of imported again"""
+    from .refs import find_dois
+
+    rows = []
+    for ident in ids:
+        dois = find_dois(ident)
+        hit = _same_paper_without_doi(zot, dois[0]) if len(dois) == 1 else None
+        if not hit:
+            continue
+        row = {
+            "input": ident,
+            "status": "exists",
+            "matched": "title",
+            "identifier": f"DOI:{dois[0]}",
+            "item": hit,
+        }
+        if not dry_run:
+            if target:
+                zot.call(
+                    "add_items_to_collection",
+                    collectionKey=target["key"],
+                    itemKeys=[hit["itemKey"]],
+                )
+            zot.call("write_metadata", itemKey=hit["itemKey"], fields={"DOI": dois[0]})
+            row["doi_written"] = True
+        rows.append(row)
+    return rows
+
+
 @app.command()
 def add(
     identifiers: list[str] = typer.Argument(
@@ -209,8 +279,10 @@ def add(
     """Import items by DOI with Zotero's own resolvers and fetch their PDFs.
 
     Identifiers already in the library are not imported again; with -c they are
-    filed into the collection too. Prints one line per identifier and lists the
-    items that came without a PDF.
+    filed into the collection too. A DOI whose paper is in the library without a
+    DOI (same title and year) counts as existing too: it is filed, and the DOI is
+    written into that item. Prints one line per identifier and lists the items
+    that came without a PDF.
     """
     ids = _read_identifiers(identifiers or [], file)
     if not ids:
@@ -221,10 +293,14 @@ def add(
         target = (
             _collection(zot, collection, create=not dry_run) if collection else None
         )
-        info(f"📥 Importing {len(ids)} identifier(s)…")
-        results = _run_import(
+        info(f"🔎 Checking {len(ids)} identifier(s) against the library's titles…")
+        results = _file_title_matches(zot, ids, target, dry_run)
+        matched = {r["input"] for r in results}
+        todo = [i for i in ids if i not in matched]
+        info(f"📥 Importing {len(todo)} identifier(s)…")
+        results += _run_import(
             zot,
-            ids,
+            todo,
             collectionKey=target["key"] if target else None,
             saveAttachments=not no_pdf,
             fileExisting=bool(target),
@@ -246,7 +322,8 @@ def add(
             item = row.get("item") or {}
             pdf = "" if dry_run else ("PDF   " if row.get("pdfs") else "no PDF")
             what = item.get("title") or row.get("identifier") or row.get("error", "")
-            typer.echo(f"{row['status']:<18} {pdf:<6}  {row['input']}  {what}")
+            status = row["status"] + (" (title)" if row.get("matched") else "")
+            typer.echo(f"{status:<18} {pdf:<6}  {row['input']}  {what}")
 
     counts: dict[str, int] = {}
     for row in results:
