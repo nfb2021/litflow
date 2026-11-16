@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: anomalyco/opencode/github@dc2ffcf8bf26f9e669b6aa22b95f50e12be15e06 # v2.2.6
+      - uses: anomalyco/opencode/github@fedc6f208aa2bd54c1019227214568083f6380ad # v2.2.7
         env:
           AQUEDUCT_API_KEY: ${{ secrets.AQUEDUCT_API_KEY }}
           GH_TOKEN: ${{ github.token }} # Read-only, for gh; pushes use the app's token
