@@ -2,14 +2,14 @@
 # CI runs the same hooks: uvx prek run --all-files
 repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.17.4
+    rev: v0.17.6
     hooks:
       - id: ruff-check
         args: [--fix]
       - id: ruff-format
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.13.7
+    rev: 0.13.9
     hooks:
       # Keep each skill's uv.lock in step with its pyproject.toml
       - id: uv-lock
@@ -42,7 +42,7 @@ repos:
       - id: detect-private-key
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.19.3
+    rev: v4.19.4
     hooks:
       # Conventional commits, scope = skill: feat(gemini_notebook): ...
       - id: commitizen
